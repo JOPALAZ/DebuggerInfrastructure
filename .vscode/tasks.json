@@ -3,22 +3,24 @@
         {
             "type": "cppbuild",
             "label": "Build and Run",
-            "command": "C:\\w64devkit\\bin\\g++.exe",
+            "command": "g++",
             "args": [
                 "-std=c++20",
                 "-fdiagnostics-color=always",
                 "-g",
-                "${workspaceFolder}\\src\\main\\main.cpp",
-                "${workspaceFolder}\\src\\Logger\\Logger.cpp",
-                "${workspaceFolder}\\src\\Common\\DbHandler.cpp",
-                "${workspaceFolder}\\src\\REST\\RESTapi.cpp",
-                "${workspaceFolder}\\src\\FrontEnd\\FrontEnd.cpp",
+                "${workspaceFolder}/src/main/main.cpp",
+                "${workspaceFolder}/src/Logger/Logger.cpp",
+                "${workspaceFolder}/src/Common/DbHandler.cpp",
+                "${workspaceFolder}/src/REST/RESTapi.cpp",
+                "${workspaceFolder}/src/FrontEnd/FrontEnd.cpp",
+                "${workspaceFolder}/src/LaserHandler/LaserHandler.cpp",
+                "-x",
+                "c",
+                "${workspaceFolder}/src/ThirdParties/sqlite3/sqlite3.c",
                 "-o",
-                "${workspaceFolder}\\main.exe",
-                "-L${workspaceFolder}\\libs",
-                "-lsqlite3",
-                "-lws2_32",
-                "-O3"
+                "${workspaceFolder}/main",
+                "-lfmt",
+                "-lgpiod"
             ],
             "options": {
                 "cwd": "${workspaceFolder}"
@@ -33,7 +35,7 @@
         {
             "label": "Run",
             "type": "shell",
-            "command": "${workspaceFolder}\\main.exe",
+            "command": "${workspaceFolder}/main",
             "options": {
                 "cwd": "${workspaceFolder}"
             },

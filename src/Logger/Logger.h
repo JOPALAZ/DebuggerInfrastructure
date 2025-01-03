@@ -5,11 +5,12 @@
 #include <filesystem>
 #include <vector>
 #include <chrono>
-#include <format>
 #include <sstream>
 #include <iomanip>
 #include <stdexcept>
 #include <ctime>
+#include <fmt/format.h>
+#include <fmt/core.h>
 
 /**
  * @brief A simple Logger class that writes messages to both a file and console (based on severities).
@@ -38,6 +39,11 @@ private:
     static bool initialized;
 
     /**
+     * @brief Returns the current local time as a string, formatted as YYYY-MM-DD-HH-MM-SS.
+     */
+    static std::string getCurrentTime();
+
+    /**
      * @brief Base logging function that does actual output to file/console.
      * @tparam T the message type (usually std::string).
      * @param severity severity of the message.
@@ -55,11 +61,6 @@ public:
      * @throw std::ios_base::failure if file creation fails.
      */
     static void Initialize(std::filesystem::path logPath, int minSeverityToLogfile, int minSeverityToLogConsole);
-
-    /**
-     * @brief Returns the current local time as a string, formatted as YYYY-MM-DD-HH-MM-SS.
-     */
-    static std::string getCurrentTime();
 
     //---------------------------------------------------------------------------------------------
     // Non-formatted logging methods (directly accept a string or other printable type).
@@ -133,7 +134,7 @@ void Logger::BaseLog(int severity, T msg)
     }
 
     // Example: [2024-12-28-10-22-30] [INF]: Your message
-    std::string str = std::format("[{}] [{}]: {}", getCurrentTime(), severityStr, msg);
+    std::string str = fmt::format("[{}] [{}]: {}", getCurrentTime(), severityStr, msg);
 
     // Log to file if the severity is >= minSeverityToLogfile
     if (severity >= Logger::minSeverityToLogfile && Logger::fileOutput.is_open()) {
@@ -178,27 +179,27 @@ void Logger::Critical(T msg)
 template <typename... Args>
 void Logger::Verbose(std::string_view msgFormat, Args&&... args)
 {
-    std::string msg = std::vformat(msgFormat, std::make_format_args(args...));
+    std::string msg = fmt::vformat(msgFormat, fmt::make_format_args(args...));
     Verbose(msg);
 }
 
 template <typename... Args>
 void Logger::Info(std::string_view msgFormat, Args&&... args)
 {
-    std::string msg = std::vformat(msgFormat, std::make_format_args(args...));
+    std::string msg = fmt::vformat(msgFormat, fmt::make_format_args(args...));
     Info(msg);
 }
 
 template <typename... Args>
 void Logger::Error(std::string_view msgFormat, Args&&... args)
 {
-    std::string msg = std::vformat(msgFormat, std::make_format_args(args...));
+    std::string msg = fmt::vformat(msgFormat, fmt::make_format_args(args...));
     Error(msg);
 }
 
 template <typename... Args>
 void Logger::Critical(std::string_view msgFormat, Args&&... args)
 {
-    std::string msg = std::vformat(msgFormat, std::make_format_args(args...));
+    std::string msg = fmt::vformat(msgFormat, fmt::make_format_args(args...));
     Critical(msg);
 }

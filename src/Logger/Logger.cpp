@@ -26,7 +26,7 @@ void Logger::Initialize(std::filesystem::path logPath, int minSeverityFile, int 
         // we'll get something like C:/Logs/log2024-12-28-10-22-30.log
         // Feel free to adjust to your liking
         std::filesystem::path finalLogFile = logPath;
-        finalLogFile /= std::format("log{}.log", getCurrentTime());
+        finalLogFile = fmt::format("log{}.log", getCurrentTime());
 
         // Open the file
         Logger::fileOutput.open(finalLogFile, std::ios::out);

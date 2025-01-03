@@ -1,6 +1,6 @@
-#include "..\FrontEnd\FrontEnd.h"
-#include "..\Logger\Logger.h"
-#include "..\REST\RESTapi.h"
+#include "FrontEnd.h"
+#include "../Logger/Logger.h"
+#include "../REST/RESTapi.h"
 #include <fstream>
 #include <regex>
 #include <sstream>

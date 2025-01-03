@@ -6,7 +6,7 @@
 #include <stdexcept>
 #include <mutex>
 #include <chrono>
-#include "..\ThirdParties\sqlite3.h"
+#include "../ThirdParties/sqlite3/sqlite3.h"
 
 // Forward declaration, so we can use RecordData in DbHandler.
 struct RecordData;

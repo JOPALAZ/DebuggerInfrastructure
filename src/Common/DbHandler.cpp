@@ -1,7 +1,6 @@
 #include "DbHandler.h"
 #include <cstring>    // for strnlen
-#include <format>
-#include "..\Logger\Logger.h"
+#include "../Logger/Logger.h"
 
 //----------------------------------------------
 // Safe string conversion
@@ -41,7 +40,7 @@ RecordData::RecordData(int64_t time, int event, const std::string& className, co
 //----------------------------------------------
 DbHandler::DbHandler()
 {
-    dbpath = "..\\db.sqlite3";
+    dbpath = "db.sqlite3";
     this->OpenDb();
     this->CreateTableIfNeeded();
 }
@@ -220,7 +219,7 @@ void DbHandler::CreateTableIfNeeded()
         Logger::Error("Error creating table: {}", errorMessage);
         std::string errStr = errorMessage ? errorMessage : "Unknown error";
         sqlite3_free(errorMessage);
-        throw std::runtime_error(std::format("Error creating table: {}", errStr));
+        throw std::runtime_error(fmt::format("Error creating table: {}", errStr));
     } else {
         Logger::Verbose("Table created successfully (or already exists).");
     }
@@ -234,7 +233,7 @@ void DbHandler::OpenDb()
     int exitCode = sqlite3_open(dbpath.generic_string().c_str(), &db);
     if (exitCode) {
         Logger::Error("Error opening database: {}", std::string{sqlite3_errmsg(db)});
-        throw std::ios_base::failure(std::format("Error opening database: {}", sqlite3_errmsg(db)));
+        throw std::ios_base::failure(fmt::format("Error opening database: {}", sqlite3_errmsg(db)));
     }
     Logger::Verbose("Database opened successfully!");
 }

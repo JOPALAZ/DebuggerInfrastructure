@@ -1,10 +1,11 @@
 #include <iostream>
 #include <thread>
 #include <vector>
-#include "..\FrontEnd\FrontEnd.h"
-#include "..\Logger\Logger.h"
-#include "..\Common\DbHandler.h"
-#include "..\REST\RESTapi.h"
+#include "../FrontEnd/FrontEnd.h"
+#include "../Logger/Logger.h"
+#include "../Common/DbHandler.h"
+#include "../REST/RESTapi.h"
+#include "../LaserHandler/LaserHandler.h"
 
 std::string generateGUID() {
     std::random_device rd;
@@ -33,6 +34,7 @@ std::string generateGUID() {
 int main()
 {
     Logger::Initialize("", 1, 0);
+    LaserHandler::Initialize(16);
 
     DbHandler db;
     
@@ -76,5 +78,6 @@ int main()
     }
     rest.Stop();
     front.Stop();
+    LaserHandler::Dispose();
     return 0;
 }

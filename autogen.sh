@@ -23,14 +23,14 @@ else
 fi
 
 # Calculate number of processes (2 * threads)
-NUM_CORES=$((2 * NUM_THREADS))
+NUM_PROCESSES=$((2 * NUM_THREADS))
 
 # Print usage
 function usage() {
-    echo "Usage: $0 [-b build_dir] [-t build_type] [-j num_cores]"
+    echo "Usage: $0 [-b build_dir] [-t build_type] [-j num_processes]"
     echo "  -b  Build directory (default: ${BUILD_DIR})"
     echo "  -t  Build type (default: ${BUILD_TYPE})"
-    echo "  -j  Number of cores for parallel build (default: ${NUM_CORES})"
+    echo "  -j  Number of processes for parallel build (default: ${NUM_PROCESSES})"
     exit 1
 }
 
@@ -39,7 +39,7 @@ while getopts "b:t:j:h" opt; do
     case ${opt} in
         b) BUILD_DIR="${OPTARG}" ;;
         t) BUILD_TYPE="${OPTARG}" ;;
-        j) NUM_CORES="${OPTARG}" ;;
+        j) NUM_PROCESSES="${OPTARG}" ;;
         h) usage ;;
         *) usage ;;
     esac
@@ -54,8 +54,8 @@ echo "Configuring project with CMake..."
 cmake -S . -B "${BUILD_DIR}" -DCMAKE_BUILD_TYPE="${BUILD_TYPE}"
 
 # Build the project
-echo "Building project with ${NUM_CORES} processes..."
-cmake --build "${BUILD_DIR}" --config "${BUILD_TYPE}" -- -j "${NUM_CORES}"
+echo "Building project with ${NUM_PROCESSES} processes..."
+cmake --build "${BUILD_DIR}" --config "${BUILD_TYPE}" -- -j "${NUM_PROCESSES}"
 
 # Print success message
 echo "Build completed successfully!"

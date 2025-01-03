@@ -5,27 +5,27 @@
 #include <string>
 
 // Define the static member variables
-std::mutex LaserHandler::mtx;
-bool LaserHandler::lock = true;
-unsigned int LaserHandler::GPIOpin = 0;
-const char* LaserHandler::chipname = "gpiochip0";
-gpiod_chip* LaserHandler::chip = nullptr;
-gpiod_line* LaserHandler::line = nullptr;
-bool LaserHandler::initialized = false;
+std::mutex       LaserHandler::mtx;
+bool             LaserHandler::lock       = true;
+unsigned int     LaserHandler::GPIOpin    = 0;
+const char*      LaserHandler::chipname   = "gpiochip0";
+gpiod_chip*      LaserHandler::chip       = nullptr;
+gpiod_line*      LaserHandler::line       = nullptr;
+bool             LaserHandler::initialized = false;
 
-void LaserHandler::Initialize(const unsigned int GPIOpin)
+void LaserHandler::Initialize(unsigned int GPIOpin)
 {
-    // Protect shared data/state
+    // Acquire the mutex to protect shared state
     std::lock_guard<std::mutex> guard(mtx);
 
     if (initialized)
     {
         Logger::Info("LaserHandler is already initialized.");
-        // Ensure the requested pin matches the already-initialized pin
         if (GPIOpin != LaserHandler::GPIOpin)
         {
             std::runtime_error ex(
-                "Initialization requested for laser handler with different GPIO pin, cannot proceed.");
+                "Initialization requested with a different GPIO pin, cannot proceed."
+            );
             Logger::Critical(ex.what());
             throw ex;
         }
@@ -33,8 +33,8 @@ void LaserHandler::Initialize(const unsigned int GPIOpin)
     }
 
     LaserHandler::GPIOpin = GPIOpin;
-    
-    // Open GPIO chip
+
+    // Open the GPIO chip
     chip = gpiod_chip_open_by_name(chipname);
     if (!chip)
     {
@@ -57,48 +57,99 @@ void LaserHandler::Initialize(const unsigned int GPIOpin)
     // Request the line as output
     if (gpiod_line_request_output(line, "LASER_gpio", 0) < 0)
     {
-        std::runtime_error ex("Failed to request line as output for the laser");
+        std::runtime_error ex("Failed to request line as output for the laser.");
         Logger::Critical(ex.what());
         gpiod_chip_close(chip);
         chip = nullptr;
         line = nullptr;
         throw ex;
     }
-    
-    // Unlock and disable the laser initially
-    LaserHandler::lock = false;
-    gpiod_line_set_value(line, 0);
+
+    // Initially unlock and disable (no extra locking here)
+    Unlock_Internal();
+    Disable_Internal();
 
     LaserHandler::initialized = true;
     Logger::Info("LaserHandler initialized successfully.");
 }
 
-void LaserHandler::EmergencyDisableAndLock()
+void LaserHandler::Dispose()
 {
+    // Acquire the mutex to protect shared state
     std::lock_guard<std::mutex> guard(mtx);
 
-    // Disable laser and lock it
-    LaserHandler::Disable();
-    LaserHandler::lock = true;
-    Logger::Info("Laser is disabled and locked.");
+    // Perform emergency disable and lock for safety
+    EmergencyDisableAndLock_Internal();
+
+    // Close GPIO resources
+    if (chip)
+    {
+        gpiod_chip_close(chip);
+        chip = nullptr;
+    }
+    line = nullptr;
+    initialized = false;
+
+    Logger::Info("Disposed of LaserHandler resources.");
+}
+
+void LaserHandler::EmergencyDisableAndLock()
+{
+    // Acquire the mutex, then call the internal method
+    std::lock_guard<std::mutex> guard(mtx);
+    EmergencyDisableAndLock_Internal();
 }
 
 void LaserHandler::Unlock()
 {
+    // Acquire the mutex, then call the internal method
     std::lock_guard<std::mutex> guard(mtx);
-
-    LaserHandler::lock = false;
-    Logger::Info("Laser is unlocked.");
+    Unlock_Internal();
 }
 
 void LaserHandler::Enable()
 {
+    // Acquire the mutex, then call the internal method
     std::lock_guard<std::mutex> guard(mtx);
+    Enable_Internal();
+}
 
+void LaserHandler::Disable()
+{
+    // Acquire the mutex, then call the internal method
+    std::lock_guard<std::mutex> guard(mtx);
+    Disable_Internal();
+}
+
+// ----------------------- Internal methods (no mutex) ----------------------- //
+
+void LaserHandler::EmergencyDisableAndLock_Internal()
+{
+    // Disable the laser and set lock to true (no extra locking here)
+    Disable_Internal();
+    lock = true;
+    Logger::Info("Laser is disabled and locked (emergency).");
+}
+
+void LaserHandler::Unlock_Internal()
+{
+    lock = false;
+    Logger::Info("Laser is unlocked.");
+}
+
+void LaserHandler::Enable_Internal()
+{
     if (!lock)
     {
-        gpiod_line_set_value(line, 1);
-        Logger::Info("Laser enabled.");
+        if (line != nullptr)
+        {
+            gpiod_line_set_value(line, 1);
+            Logger::Info("Laser enabled.");
+        }
+        else
+        {
+            Logger::Warning("Enable called but line is not initialized.");
+        }
     }
     else
     {
@@ -106,10 +157,8 @@ void LaserHandler::Enable()
     }
 }
 
-void LaserHandler::Disable()
+void LaserHandler::Disable_Internal()
 {
-    std::lock_guard<std::mutex> guard(mtx);
-
     if (line != nullptr)
     {
         gpiod_line_set_value(line, 0);
@@ -119,23 +168,4 @@ void LaserHandler::Disable()
     {
         Logger::Info("Disable called but line is not initialized.");
     }
-}
-
-void LaserHandler::Dispose()
-{
-    std::lock_guard<std::mutex> guard(mtx);
-
-    // Disable and lock for safety
-    LaserHandler::EmergencyDisableAndLock();
-
-    // Close chip resources
-    if (chip != nullptr)
-    {
-        gpiod_chip_close(chip);
-        chip = nullptr;
-    }
-    line = nullptr;
-
-    initialized = false;
-    Logger::Info("Disposed of LaserHandler resources.");
 }

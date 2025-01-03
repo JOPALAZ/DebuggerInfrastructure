@@ -22,7 +22,7 @@ private:
     /**
      * @brief Represents whether the laser is locked or not.
      *
-     * When locked, @ref Enable() does nothing (the laser remains disabled).
+     * When locked, @ref Enable_Internal() does nothing (the laser remains disabled).
      */
     static bool lock;
 
@@ -51,6 +51,26 @@ private:
      */
     static bool initialized;
 
+    /**
+     * @brief Internal (no mutex) unlock logic.
+     */
+    static void Unlock_Internal();
+
+    /**
+     * @brief Internal (no mutex) enable logic.
+     */
+    static void Enable_Internal();
+
+    /**
+     * @brief Internal (no mutex) disable logic.
+     */
+    static void Disable_Internal();
+
+    /**
+     * @brief Internal (no mutex) emergency disable + lock logic.
+     */
+    static void EmergencyDisableAndLock_Internal();
+
 public:
     /**
      * @brief Initializes the LaserHandler with the specified GPIO pin.
@@ -61,12 +81,12 @@ public:
      * @param GPIOpin The pin number on the GPIO chip to be used for laser control.
      * @throw std::runtime_error If the chip or line fails to open, or if line request fails.
      */
-    static void Initialize(const unsigned int GPIOpin = 16);
+    static void Initialize(unsigned int GPIOpin = 16);
 
     /**
      * @brief Disables the laser immediately and locks it (cannot be enabled until unlocked).
      *
-     * Calls @ref Disable() internally, then sets @ref lock to true.
+     * Calls @ref Disable_Internal() internally, then sets @ref lock to true.
      */
     static void EmergencyDisableAndLock();
 

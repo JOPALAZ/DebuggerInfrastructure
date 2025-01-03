@@ -44,6 +44,7 @@ void setupSignalHandlers() {
 
 int main()
 {
+    setupSignalHandlers();
     Logger::Initialize("", 1, 0);
     LaserHandler::Initialize(16);
 

@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Bug Slaughter Log</title>
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+  <!-- Font Awesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <style>
+    /* --- RESET & BASE STYLES --- */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Roboto', sans-serif;
+      background-color: #0a0a0a; /* Almost pure black for maximum darkness */
+      color: #e6e6e6; /* Slightly off-white for better readability */
+      padding: 40px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    h1 {
+      margin-bottom: 30px;
+      font-size: 3em;
+      color: #ff0000; /* Intense red for a striking header */
+      text-align: center;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      text-shadow: 0 0 15px #ff0000, 0 0 25px #ff0000; /* Strong glow effect */
+    }
+
+    /* --- STATUS SECTION --- */
+    #status {
+      display: flex;
+      align-items: center;
+      margin-bottom: 25px;
+      padding: 20px 25px;
+      border-radius: 10px;
+      background-color: #1a1a1a; /* Very dark gray background */
+      font-size: 1.3em;
+      box-shadow: 0 6px 12px rgba(255, 0, 0, 0.5); /* Deep red shadow */
+      transition: background-color 0.3s, color 0.3s;
+      text-transform: uppercase;
+    }
+    #status.success {
+      background-color: #660000; /* Dark crimson for success */
+      color: #ffcccc;           /* Soft red text */
+    }
+    #status.error {
+      background-color: #990000; /* Darker red for errors */
+      color: #ffe6e6;            /* Lighter red text */
+    }
+    #status.loading {
+      background-color: #1a1a1a;
+      color: #ff0000; /* Bright red for loading */
+    }
+    #status i {
+      margin-right: 15px;
+      font-size: 1.8em;
+    }
+
+    /* --- BUTTONS --- */
+    .btn-container {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 30px;
+    }
+    button {
+      padding: 14px 30px;
+      margin: 0 20px;
+      border: none;
+      border-radius: 8px;
+      background-color: #8b0000; /* Blood red button */
+      color: #fff;
+      font-size: 1.1em;
+      cursor: pointer;
+      transition: 
+        background-color 0.3s, 
+        transform 0.2s, 
+        box-shadow 0.3s;
+      display: flex;
+      align-items: center;
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.6);
+    }
+    button:hover {
+      background-color: #b30000; /* Brighter red on hover */
+      transform: translateY(-4px);
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.7);
+    }
+    button:active {
+      transform: translateY(0);
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.6);
+    }
+    button i {
+      margin-right: 12px;
+      font-size: 1.3em;
+    }
+    /* Specific styles for the Disable button */
+    .btn-disable {
+      background-color: #a30000;
+    }
+    .btn-disable:hover {
+      background-color: #d60000;
+    }
+
+    /* --- MESSAGE SECTION --- */
+    #message {
+      display: none;
+      margin-bottom: 25px;
+      padding: 20px 25px;
+      border-radius: 10px;
+      font-size: 1.2em;
+      text-align: center;
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.6);
+      transition: background-color 0.3s, color 0.3s;
+      text-transform: uppercase;
+    }
+    #message.success {
+      background-color: #660000;
+      color: #ffcccc;
+      display: flex;
+      align-items: center;
+    }
+    #message.error {
+      background-color: #990000;
+      color: #ffe6e6;
+      display: flex;
+      align-items: center;
+    }
+    #message i {
+      margin-right: 15px;
+      font-size: 1.5em;
+    }
+
+    /* --- TABLE STYLES --- */
+    .table-container {
+      width: 100%;
+      max-width: 1200px;
+      overflow-x: auto;
+      border-radius: 10px;
+      box-shadow: 0 6px 18px rgba(255, 0, 0, 0.5);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background-color: #0f0f0f; /* Near black table background */
+      border-radius: 10px;
+      overflow: hidden;
+      color: #e6e6e6;
+    }
+    thead {
+      background-color: #4d0000; /* Deep red table header */
+    }
+    th, td {
+      padding: 18px 25px;
+      text-align: left;
+      font-size: 1.05em;
+      border-bottom: 1px solid #660000; /* Dark red border */
+    }
+    tbody tr {
+      transition: background-color 0.3s;
+    }
+    /* Alternating row colors for depth */
+    tbody tr:nth-child(even) {
+      background-color: #2b0000;
+    }
+    tbody tr:hover {
+      background-color: #4d0000;
+    }
+    th {
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      border-bottom: 3px solid #b30000;
+    }
+
+    /* --- RESPONSIVE DESIGN --- */
+    @media (max-width: 768px) {
+      table, thead, tbody, th, td, tr {
+        display: block;
+      }
+      thead {
+        display: none;
+      }
+      tbody tr {
+        margin-bottom: 20px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.6);
+      }
+      tbody tr td {
+        padding-left: 60%;
+        position: relative;
+        text-align: right;
+        border-bottom: 1px solid #660000;
+      }
+      tbody tr td::before {
+        content: attr(data-label);
+        position: absolute;
+        left: 20px;
+        width: 50%;
+        padding-right: 10px;
+        white-space: nowrap;
+        font-weight: 700;
+        text-align: left;
+        color: #ff0000; /* Red labels for emphasis */
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Bug Slaughter Log</h1>
+
+  <!-- Displays the current status (fetched from /status) -->
+  <div id="status" class="loading">
+    <i class="fas fa-spinner fa-spin"></i> Status: Loading...
+  </div>
+
+  <!-- Displays messages (success or error) -->
+  <div id="message"></div>
+
+  <!-- Buttons to call /enable or /disable endpoints -->
+  <div class="btn-container">
+    <button onclick="enableFeature()"><i class="fas fa-check"></i> Enable</button>
+    <button class="btn-disable" onclick="disableFeature()"><i class="fas fa-times"></i> Disable</button>
+  </div>
+
+  <!-- Table to display data fetched from /data -->
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>Event</th>
+          <th>Time</th>
+          <th>ClassName</th>
+          <th>Outcome</th>
+        </tr>
+      </thead>
+      <tbody id="data-body">
+        <!-- Rows will be added dynamically -->
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    // --- CONFIG ---
+    const BASE_URL = 'REPLACEMEPLEASE';
+
+    /**
+     * Converts a UNIX timestamp to a human-readable date and time string.
+     * @param {number} unixTimestamp - The UNIX timestamp to convert.
+     * @returns {string} - The formatted date and time.
+     */
+    function formatTimestamp(unixTimestamp) {
+      const date = new Date(unixTimestamp * 1000); // Convert to milliseconds
+      return date.toLocaleString();
+    }
+
+    /**
+     * Updates the status section with the given status and type.
+     * @param {string} status - The status message to display.
+     * @param {string} type - The type of status ('success', 'error', 'loading').
+     */
+    function updateStatus(status, type = 'loading') {
+      const statusDiv = document.getElementById('status');
+      statusDiv.className = type;
+      let icon;
+      switch(type) {
+        case 'success':
+          icon = '<i class="fas fa-check-circle"></i>';
+          break;
+        case 'error':
+          icon = '<i class="fas fa-exclamation-circle"></i>';
+          break;
+        case 'loading':
+        default:
+          icon = '<i class="fas fa-spinner fa-spin"></i>';
+      }
+      statusDiv.innerHTML = `${icon} Status: ${status}`;
+    }
+
+    /**
+     * Displays a message in the message section.
+     * @param {string} message - The message to display.
+     * @param {string} type - The type of message ('success', 'error').
+     */
+    function showMessage(message, type) {
+      const messageDiv = document.getElementById('message');
+      messageDiv.className = type;
+      let icon;
+      switch(type) {
+        case 'success':
+          icon = '<i class="fas fa-check-circle"></i>';
+          break;
+        case 'error':
+          icon = '<i class="fas fa-exclamation-circle"></i>';
+          break;
+        default:
+          icon = '';
+      }
+      messageDiv.innerHTML = `${icon} ${message}`;
+      messageDiv.style.display = 'flex';
+      setTimeout(() => {
+        messageDiv.style.display = 'none';
+      }, 5000);
+    }
+
+    /**
+     * Fetches the current status from the server and updates the status section.
+     */
+    async function fetchStatus() {
+      updateStatus('Loading...', 'loading');
+      try {
+        const response = await fetch(`${BASE_URL}/status`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        updateStatus(data.status, 'success');
+      } catch (error) {
+        console.error('Error fetching status:', error);
+        updateStatus('Error fetching status', 'error');
+      }
+    }
+
+    /**
+     * Fetches data from the server and populates the table.
+     */
+    async function fetchData() {
+      try {
+        const response = await fetch(`${BASE_URL}/data`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const dataArray = await response.json();
+
+        const tbody = document.getElementById('data-body');
+        tbody.innerHTML = '';
+
+        dataArray.forEach(record => {
+          const row = document.createElement('tr');
+
+          const eventCell = document.createElement('td');
+          eventCell.textContent = record.event;
+          eventCell.setAttribute('data-label', 'Event');
+          row.appendChild(eventCell);
+
+          const timeCell = document.createElement('td');
+          timeCell.textContent = formatTimestamp(record.time);
+          timeCell.setAttribute('data-label', 'Time');
+          row.appendChild(timeCell);
+
+          const classNameCell = document.createElement('td');
+          classNameCell.textContent = record.className;
+          classNameCell.setAttribute('data-label', 'ClassName');
+          row.appendChild(classNameCell);
+
+          const outcomeCell = document.createElement('td');
+          outcomeCell.textContent = record.outcome;
+          outcomeCell.setAttribute('data-label', 'Outcome');
+          row.appendChild(outcomeCell);
+
+          tbody.appendChild(row);
+        });
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        showMessage('Error fetching data. Please try again later.', 'error');
+      }
+    }
+
+    /**
+     * Sends a request to enable the feature and updates the UI accordingly.
+     */
+    async function enableFeature() {
+      try {
+        updateStatus('Activating offensive protocols...', 'loading');
+        const response = await fetch(`${BASE_URL}/enable`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        showMessage(data.message, 'success');
+        fetchStatus();
+      } catch (error) {
+        console.error('Error calling /enable:', error);
+        showMessage('Error activating offensive protocols.', 'error');
+        updateStatus('Error activating offensive protocols', 'error');
+      }
+    }
+
+    /**
+     * Sends a request to disable the feature and updates the UI accordingly.
+     */
+    async function disableFeature() {
+      try {
+        updateStatus('Disabling offensive protocols...', 'loading');
+        const response = await fetch(`${BASE_URL}/disable`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        showMessage(data.message, 'success');
+        fetchStatus();
+      } catch (error) {
+        console.error('Error calling /disable:', error);
+        showMessage('Error disabling offensive protocols.', 'error');
+        updateStatus('Error disabling offensive protocols', 'error');
+      }
+    }
+
+    /**
+     * Initializes the page by fetching data and status, and setting up periodic status updates.
+     */
+    (function init() {
+      fetchData();
+      fetchStatus();
+      setInterval(fetchStatus, 30000); // Update status every 30 seconds
+    })();
+  </script>
+
+</body>
+</html>

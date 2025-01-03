@@ -1,3 +1,4 @@
+#include <csignal>
 #include <iostream>
 #include <thread>
 #include <vector>
@@ -29,7 +30,17 @@ std::string generateGUID() {
 
     return oss.str();
 }
+void signalHandler(int signal) {
+    std::cerr << "Signal " << signal << " received, disposing resources..." << std::endl;
+    LaserHandler::Dispose();
+    exit(signal);
+}
 
+void setupSignalHandlers() {
+    std::signal(SIGINT, signalHandler);
+    std::signal(SIGTERM, signalHandler);
+    std::signal(SIGHUP, signalHandler);
+}
 
 int main()
 {

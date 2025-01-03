@@ -4,37 +4,31 @@
 #include <atomic>
 #include <string>
 #include <iostream>
-#include <chrono>
+#include <fstream>
+#include <sstream>
 #include <mutex>
+#include <filesystem>
 
-#include "..\ThirdParties\httplib.h"  // https://github.com/yhirose/cpp-httplib
-class DbHandler;
+#include "..\ThirdParties\httplib.h" // https://github.com/yhirose/cpp-httplib
+
 /**
- * @brief A simple REST API server that runs on a separate thread,
- *        providing endpoints /data/range, /status, /enable, /disable.
+ * @brief A simple HTTP server class to host a static HTML file (index.html).
  */
-class RESTApi
+class FrontEnd
 {
 public:
     /**
      * @brief Constructor. Does NOT start the server automatically.
+     * @param htmlFilePath Path to the index.html file.
      * @param listenAddress IP address or hostname (e.g., "0.0.0.0") to listen on.
      * @param port The port to bind to, e.g., 8080.
      */
-    RESTApi(const std::string& listenAddress = "0.0.0.0", int port = 8080);
-
-    /**
-     * @brief Constructor. Does NOT start the server automatically.
-     * @param db The pointer to the DbHandler instance.
-     * @param listenAddress IP address or hostname (e.g., "0.0.0.0") to listen on.
-     * @param port The port to bind to, e.g., 8080.
-     */
-    RESTApi(DbHandler* db, const std::string& listenAddress = "0.0.0.0", int port = 8080);
+    FrontEnd(const std::filesystem::path& htmlFilePath, const std::string& listenAddress = "0.0.0.0", int port = 8080);
 
     /**
      * @brief Destructor. Stops the server if running.
      */
-    ~RESTApi();
+    ~FrontEnd();
 
     /**
      * @brief Starts the server in a separate thread.
@@ -47,12 +41,10 @@ public:
     void Stop();
 
 private:
-    /**
-     * @brief Registers all HTTP endpoints (GET handlers).
-     */
-    void RegisterEndpoints();
+    std::string LoadFileContent(const std::filesystem::path& filePath);
 
 private:
+    std::filesystem::path htmlFilePath_;
     std::string listenAddress_;
     int port_;
 

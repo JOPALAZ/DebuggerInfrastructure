@@ -1,81 +1,88 @@
-#include "RESTApi.h"
+#include "..\FrontEnd\FrontEnd.h"
 #include "..\Logger\Logger.h"
-#include "..\Common\DbHandler.h"
-#include "..\ThirdParties\nlohmann\json.hpp"  // nlohmann::json
+#include "..\REST\RESTapi.h"
+#include <fstream>
+#include <regex>
+#include <sstream>
 
-// A static pointer to a single DbHandler instance for demonstration.
-// In a real application, you might inject it via constructor or use a singleton.
-static DbHandler* dbHandler = nullptr;
-
-// We'll use this for convenience:
-using nlohmann::json;
-
-RESTApi::RESTApi(const std::string& listenAddress, int port)
-    : listenAddress_(listenAddress)
-    , port_(port)
-    , serverThread_()
-    , stopRequested_(false)
+std::string SplitPort(const std::string& str)
 {
-    // Initialize or acquire DbHandler instance here
-    static DbHandler dbInstance; 
-    dbHandler = &dbInstance; 
+    return str.substr(0,str.find(':'));
 }
 
-RESTApi::RESTApi(DbHandler* db, const std::string& listenAddress, int port)
-    : listenAddress_(listenAddress)
-    , port_(port)
-    , serverThread_()
-    , stopRequested_(false)
+FrontEnd::FrontEnd(const std::filesystem::path& htmlFilePath, const std::string& listenAddress, int port)
+    : htmlFilePath_(std::filesystem::absolute(htmlFilePath))   // Path to the HTML file to serve
+    , listenAddress_(listenAddress) // IP address to bind to
+    , port_(port)                   // Port to bind to
+    , stopRequested_(false)         // Atomic flag for stopping the server
+{}
+
+FrontEnd::~FrontEnd()
 {
-    dbHandler = db;
+    Stop(); // Ensure the server is stopped when the object is destroyed
 }
 
-RESTApi::~RESTApi()
+void FrontEnd::Start()
 {
-    Stop();
-}
-
-void RESTApi::Start()
-{
+    // Prevent starting the server if it's already running
     if (serverThread_.joinable()) {
-        Logger::Info("RESTApi is already running! No action taken.");
+        Logger::Info("Server is already running! No action taken.");
         return;
     }
 
-    stopRequested_ = false;
-
-    svr_.set_pre_routing_handler([&](const httplib::Request& req, httplib::Response& res) -> httplib::Server::HandlerResponse {
-        res.set_header("Access-Control-Allow-Origin", "*");
-        res.set_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-        res.set_header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-
-        if (req.method == "OPTIONS") {
-            res.status = 200;
-            res.set_content("", "text/plain");
-            return httplib::Server::HandlerResponse::Handled;
-        }
-        return httplib::Server::HandlerResponse::Unhandled;
-    });
-
+    stopRequested_ = false; // Reset the stop flag
 
     // Launch the server in a separate thread
     serverThread_ = std::thread([this]() {
-        RegisterEndpoints();
+        // Set up a route to serve the HTML file
+        svr_.Get("/", [this](const httplib::Request& req, httplib::Response& res) {
 
-        Logger::Info(std::format("Starting RESTApi on {}:{}", listenAddress_, port_));
-        // This call blocks until svr_.stop() is called
+            Logger::Verbose("GET / => LoadFileContent({})", htmlFilePath_.generic_string());
+            // Load the HTML file content
+            std::string content = LoadFileContent(htmlFilePath_);
+
+            if (!content.empty()) {
+                // Dynamically replace `BASE_URL` with the REST API's address
+                auto it = req.headers.find("Host");
+                std::string host = (it != req.headers.end()) ? SplitPort(it->second) : "localhost";
+                int port = RESTApi::GetPort();
+                if(port == -1)
+                {
+                    throw std::runtime_error("Cannot parse RESTapi port -> no sense to start FrontEnd");
+                }
+                std::string restUrl = "http://" + host + ':' + std::to_string(port);
+
+                content = std::regex_replace(
+                    content,
+                    std::regex(R"(const BASE_URL = 'REPLACEMEPLEASE';)"), // Pattern to replace
+                    "const BASE_URL = '" + restUrl + "';"               // Replacement value
+                );
+
+                // Respond with the modified HTML content
+                res.set_content(content, "text/html");
+            } else {
+                // Respond with a 404 error if the file is not found
+                res.status = 404;
+                res.set_content("index.html not found", "text/plain");
+            }
+        });
+
+        // Start the server and log the event
+        Logger::Info("Starting server on {}:{}", listenAddress_, port_);
         svr_.listen(listenAddress_.c_str(), port_);
-        Logger::Info("RESTApi stopped.");
+        Logger::Info("Server stopped.");
     });
 }
 
-void RESTApi::Stop()
+void FrontEnd::Stop()
 {
+    // Ensure the server is running before attempting to stop it
     if (!serverThread_.joinable()) {
-        Logger::Info("RESTApi is not running, stop request ignored.");
+        Logger::Info("Server is not running, stop request ignored.");
         return;
     }
 
+    // Signal the server to stop and wait for the thread to join
     stopRequested_ = true;
     svr_.stop();
 
@@ -84,199 +91,17 @@ void RESTApi::Stop()
     }
 }
 
-void RESTApi::RegisterEndpoints()
+std::string FrontEnd::LoadFileContent(const std::filesystem::path& filePath)
 {
-    /**
-     * GET /data
-     *
-     * Possible scenarios based on query params:
-     *   - no params => returns all data
-     *   - start & end => returns data in [start, end]
-     *   - only start => returns data where time > start
-     *   - only end => returns data where time < end
-     *
-     * Returns JSON array of objects:
-     * [
-     *   {
-     *     "time": <number>,
-     *     "event": <number>,
-     *     "className": <string>,
-     *     "outcome": <string>
-     *   },
-     *   ...
-     * ]
-     */
-    svr_.Get("/data", [&](const httplib::Request& req, httplib::Response& res) {
-        bool hasStart = req.has_param("start");
-        bool hasEnd   = req.has_param("end");
+    // Open the file at the specified path
+    std::ifstream file(filePath);
+    if (!file.is_open()) {
+        Logger::Error("Failed to open file: {}", filePath.generic_string());
+        return {}; // Return an empty string if the file cannot be opened
+    }
 
-        // Helper lambda to parse a query param as int64_t
-        auto parseParam = [&](const std::string& paramName) -> std::optional<int64_t> {
-            try {
-                return std::stoll(req.get_param_value(paramName));
-            } catch (...) {
-                return {};
-            }
-        };
-
-        std::vector<RecordData> records;
-
-        if (!hasStart && !hasEnd) {
-            // 1) No params => all data
-            Logger::Verbose("GET /data => ReadData()");
-            records = dbHandler->ReadData();
-        }
-        else if (hasStart && hasEnd) {
-            // 2) both start & end => range
-            auto maybeStart = parseParam("start");
-            auto maybeEnd   = parseParam("end");
-            if (!maybeStart || !maybeEnd) {
-                Logger::Error("GET /data: invalid start/end parameter");
-                res.status = 400; // Bad request
-                res.set_content("Invalid 'start' or 'end' parameter (must be integer)", "text/plain");
-                return;
-            }
-            Logger::Verbose("GET /data: range => ReadDataByRange({}, {})", *maybeStart, *maybeEnd);
-            records = dbHandler->ReadDataByRange(*maybeStart, *maybeEnd);
-        }
-        else if (hasStart && !hasEnd) {
-            // 3) only start => time > start
-            auto maybeStart = parseParam("start");
-            if (!maybeStart) {
-                Logger::Error("GET /data: invalid start parameter");
-                res.status = 400;
-                res.set_content("Invalid 'start' parameter (must be integer)", "text/plain");
-                return;
-            }
-            Logger::Verbose("GET /data: after => ReadDataAfter({})", *maybeStart);
-            records = dbHandler->ReadDataAfter(*maybeStart);
-        }
-        else { // (!hasStart && hasEnd)
-            // 4) only end => time < end
-            auto maybeEnd = parseParam("end");
-            if (!maybeEnd) {
-                Logger::Error("GET /data: invalid end parameter");
-                res.status = 400;
-                res.set_content("Invalid 'end' parameter (must be integer)", "text/plain");
-                return;
-            }
-            Logger::Verbose("GET /data: before => ReadDataBefore({})", *maybeEnd);
-            records = dbHandler->ReadDataBefore(*maybeEnd);
-        }
-
-        // Build a JSON array of objects
-        json jResponse = json::array();
-        for (const auto& r : records) {
-            json jObj;
-            jObj["time"]      = r.time;
-            jObj["event"]     = r.event;
-            jObj["className"] = r.className;
-            jObj["outcome"]   = r.outcome;
-            jResponse.push_back(jObj);
-        }
-
-        // Return as JSON with the appropriate content type
-        res.set_content(jResponse.dump(), "application/json");
-    });
-
-    // GET /status
-    svr_.Get("/status", [&](const httplib::Request& req, httplib::Response& res) {
-        Logger::Verbose("Handled /status request");
-
-        json j;
-        j["status"] = "UNIMPLEMENTED";
-        res.set_content(j.dump(), "application/json");
-    });
-
-    // GET /enable
-    svr_.Get("/enable", [&](const httplib::Request& req, httplib::Response& res) {
-        Logger::Verbose("Handled /enable request");
-
-        json j;
-        j["message"] = "Enabled set to TRUE (unimplemented logic)";
-        res.set_content(j.dump(), "application/json");
-    });
-
-    // GET /disable
-    svr_.Get("/disable", [&](const httplib::Request& req, httplib::Response& res) {
-        Logger::Verbose("Handled /disable request");
-
-        json j;
-        j["message"] = "Enabled set to FALSE (unimplemented logic)";
-        res.set_content(j.dump(), "application/json");
-    });
-        // ----------------------------------------------------------------------------
-    // POST /data
-    //
-    // Expects JSON array of objects with the shape:
-    // [
-    //   {
-    //     "time": <int64>,
-    //     "event": <int>,
-    //     "className": <string>,
-    //     "outcome": <string>
-    //   },
-    //   ...
-    // ]
-    //
-    // Inserts each record into the database.
-    // ----------------------------------------------------------------------------
-    svr_.Post("/data", [&](const httplib::Request& req, httplib::Response& res) {
-        try {
-            // Parse request body as JSON
-            auto bodyJson = json::parse(req.body);
-
-            // Check if it's indeed an array
-            if (!bodyJson.is_array()) {
-                res.status = 400;
-                res.set_content("Request body must be a JSON array of RecordData objects.", "text/plain");
-                return;
-            }
-
-            // For each item in the JSON array, parse to RecordData and insert
-            int insertedCount = 0;
-            for (auto& item : bodyJson) {
-                // Validate fields: time, event, className, outcome
-                if (!item.contains("time")      || !item["time"].is_number_integer() ||
-                    !item.contains("event")     || !item["event"].is_number_integer() ||
-                    !item.contains("className") || !item["className"].is_string()      ||
-                    !item.contains("outcome")   || !item["outcome"].is_string()) 
-                {
-                    Logger::Error("POST /data: Invalid RecordData in JSON array");
-                    res.status = 400;
-                    res.set_content(R"(Each object must have "time"(int), "event"(int), "className"(string), "outcome"(string))", 
-                                    "text/plain");
-                    return;
-                }
-
-                int64_t time       = item["time"].get<int64_t>();
-                int     eventId    = item["event"].get<int>();
-                auto    className  = item["className"].get<std::string>();
-                auto    outcome    = item["outcome"].get<std::string>();
-
-                // Create RecordData object
-                RecordData rd(time, eventId, className, outcome);
-
-                // Insert into DB
-                dbHandler->InsertData(rd);
-                insertedCount++;
-            }
-
-            // If all records inserted successfully
-            Logger::Info(std::format("POST /data: Inserted {} records.", insertedCount));
-
-            // Build a success JSON response
-            json jResponse;
-            jResponse["status"]  = "OK";
-            jResponse["message"] = std::format("Inserted {} records.", insertedCount);
-
-            res.set_content(jResponse.dump(), "application/json");
-        }
-        catch (std::exception& ex) {
-            // JSON parse error or other
-            Logger::Error(std::format("POST /data exception: {}", ex.what()));
-            res.status = 400;
-            res.set_content(std::string("Error parsing or inserting data: ") + ex.what(), "text/plain");
-        }
-    });
+    // Read the file content into a string
+    std::ostringstream content;
+    content << file.rdbuf();
+    return content.str();
 }

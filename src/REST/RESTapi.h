@@ -46,6 +46,13 @@ public:
      */
     void Stop();
 
+    /**
+     * @brief Returns the port being used for RESTapi.
+     */
+    static int GetPort()
+    {
+        return port_;
+    }
 private:
     /**
      * @brief Registers all HTTP endpoints (GET handlers).
@@ -54,7 +61,7 @@ private:
 
 private:
     std::string listenAddress_;
-    int port_;
+    static int port_;
 
     httplib::Server svr_;             ///< The HTTP server instance from cpp-httplib.
     std::thread serverThread_;        ///< The thread that runs the server.

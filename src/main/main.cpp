@@ -1,6 +1,7 @@
 #include <iostream>
 #include <thread>
 #include <vector>
+#include "..\FrontEnd\FrontEnd.h"
 #include "..\Logger\Logger.h"
 #include "..\Common\DbHandler.h"
 #include "..\REST\RESTapi.h"
@@ -35,8 +36,8 @@ int main()
 
     DbHandler db;
     
-    RESTApi rest(&db,"0.0.0.0",8080);
-
+    RESTApi rest(&db,"0.0.0.0",8081);
+    FrontEnd front("./res/FrontEnd/index.html","0.0.0.0",8080);
     auto threadFunc = [&](int threadId) {
         const int insertCount = 4;
         for (int i = 0; i < insertCount; ++i)
@@ -68,10 +69,12 @@ int main()
     Logger::Info("TEST INF");
     Logger::Verbose("TEST VRB"); 
     rest.Start();
+    front.Start();
     for(;;)
     {
         std::this_thread::sleep_for(std::chrono::seconds(600));
     }
     rest.Stop();
+    front.Stop();
     return 0;
 }

@@ -3,19 +3,21 @@
 #include "..\Common\DbHandler.h"
 #include "..\ThirdParties\nlohmann\json.hpp"  // nlohmann::json
 
-// A static pointer to a single DbHandler instance for demonstration.
-// In a real application, you might inject it via constructor or use a singleton.
+// A static pointer to a single DbHandler instance.
 static DbHandler* dbHandler = nullptr;
-
+int RESTApi::port_ = -1;
 // We'll use this for convenience:
 using nlohmann::json;
 
 RESTApi::RESTApi(const std::string& listenAddress, int port)
     : listenAddress_(listenAddress)
-    , port_(port)
     , serverThread_()
     , stopRequested_(false)
 {
+    if(port_ == -1)
+    {
+        port_ = port;
+    }
     // Initialize or acquire DbHandler instance here
     static DbHandler dbInstance; 
     dbHandler = &dbInstance; 
@@ -23,10 +25,13 @@ RESTApi::RESTApi(const std::string& listenAddress, int port)
 
 RESTApi::RESTApi(DbHandler* db, const std::string& listenAddress, int port)
     : listenAddress_(listenAddress)
-    , port_(port)
     , serverThread_()
     , stopRequested_(false)
 {
+    if(port_ == -1)
+    {
+        port_ = port;
+    }
     dbHandler = db;
 }
 
@@ -71,6 +76,7 @@ void RESTApi::Start()
 
 void RESTApi::Stop()
 {
+    port_ = -1;
     if (!serverThread_.joinable()) {
         Logger::Info("RESTApi is not running, stop request ignored.");
         return;
@@ -169,6 +175,7 @@ void RESTApi::RegisterEndpoints()
         for (const auto& r : records) {
             json jObj;
             jObj["time"]      = r.time;
+
             jObj["event"]     = r.event;
             jObj["className"] = r.className;
             jObj["outcome"]   = r.outcome;

@@ -84,13 +84,13 @@ public:
     static void Warning(T msg);
 
     /**
-     * @brief Logs an error message (severity = 2).
+     * @brief Logs an error message (severity = 3).
      */
     template <typename T>
     static void Error(T msg);
 
     /**
-     * @brief Logs a critical error message (severity = 3).
+     * @brief Logs a critical error message (severity = 4).
      */
     template <typename T>
     static void Critical(T msg);

@@ -78,6 +78,12 @@ public:
     static void Info(T msg);
 
     /**
+     * @brief Logs an info message (severity = 2).
+     */
+    template <typename T>
+    static void Warning(T msg);
+
+    /**
      * @brief Logs an error message (severity = 2).
      */
     template <typename T>
@@ -104,15 +110,21 @@ public:
      */
     template <typename... Args>
     static void Info(std::string_view msgFormat, Args&&... args);
-
+    
     /**
-     * @brief Logs an error message using a format string (severity = 2).
+     * @brief Logs an warning message using a format string (severity = 2).
+     */
+    template <typename... Args>
+    static void Warning(std::string_view msgFormat, Args&&... args);
+    
+    /**
+     * @brief Logs an error message using a format string (severity = 3).
      */
     template <typename... Args>
     static void Error(std::string_view msgFormat, Args&&... args);
 
     /**
-     * @brief Logs a critical message using a format string (severity = 3).
+     * @brief Logs a critical message using a format string (severity = 4).
      */
     template <typename... Args>
     static void Critical(std::string_view msgFormat, Args&&... args);
@@ -128,8 +140,9 @@ void Logger::BaseLog(int severity, T msg)
     switch (severity) {
         case 0: severityStr = "VRB"; break;  // Verbose
         case 1: severityStr = "INF"; break;  // Info
-        case 2: severityStr = "ERR"; break;  // Error
-        case 3: severityStr = "CRT"; break;  // Critical
+        case 2: severityStr = "WRN"; break;  // Warning
+        case 3: severityStr = "ERR"; break;  // Error
+        case 4: severityStr = "CRT"; break;  // Critical
         default: severityStr = "UKN"; break; // Unknown
     }
 
@@ -165,15 +178,21 @@ void Logger::Info(T msg)
 }
 
 template <typename T>
-void Logger::Error(T msg)
+void Logger::Warning(T msg)
 {
     BaseLog(2, msg);
 }
 
 template <typename T>
-void Logger::Critical(T msg)
+void Logger::Error(T msg)
 {
     BaseLog(3, msg);
+}
+
+template <typename T>
+void Logger::Critical(T msg)
+{
+    BaseLog(4, msg);
 }
 
 template <typename... Args>
@@ -188,6 +207,13 @@ void Logger::Info(std::string_view msgFormat, Args&&... args)
 {
     std::string msg = fmt::vformat(msgFormat, fmt::make_format_args(args...));
     Info(msg);
+}
+
+template <typename... Args>
+void Logger::Warning(std::string_view msgFormat, Args&&... args)
+{
+    std::string msg = fmt::vformat(msgFormat, fmt::make_format_args(args...));
+    Warning(msg);
 }
 
 template <typename... Args>

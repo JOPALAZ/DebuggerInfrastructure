@@ -1,10 +1,13 @@
 #include <iostream>
 #include <thread>
 #include <vector>
-#include "..\FrontEnd\FrontEnd.h"
-#include "..\Logger\Logger.h"
-#include "..\Common\DbHandler.h"
-#include "..\REST\RESTapi.h"
+#include "../FrontEnd/FrontEnd.h"
+#include "../GPIOHandler/GPIOHandler.h"
+#include "../ServoHandler/ServoHandler.h"
+#include "../Logger/Logger.h"
+#include "../Common/DbHandler.h"
+#include "../REST/RESTapi.h"
+#include "../LaserHandler/LaserHandler.h"
 
 std::string generateGUID() {
     std::random_device rd;
@@ -33,7 +36,15 @@ std::string generateGUID() {
 int main()
 {
     Logger::Initialize("", 1, 0);
-
+    GPIOHandler::Initialize("gpiochip0");
+    gpiod_line* LaserLine = GPIOHandler::GetLine(16);
+    GPIOHandler::RequestLineOutput(LaserLine, "LaserGPIOpin");
+    LaserHandler::Initialize(LaserLine);
+    gpiod_line* ServoLine = GPIOHandler::GetLine(14);
+    GPIOHandler::RequestLineOutput(ServoLine, "ServoXGPIO");
+    ServoHandler sh = ServoHandler();
+    sh.Initialize(ServoLine);
+    sh.SetAngle(150);
     DbHandler db;
     
     RESTApi rest(&db,"0.0.0.0",8081);
@@ -76,5 +87,6 @@ int main()
     }
     rest.Stop();
     front.Stop();
+    LaserHandler::Dispose();
     return 0;
 }

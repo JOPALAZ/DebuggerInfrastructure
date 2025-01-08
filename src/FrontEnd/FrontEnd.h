@@ -9,7 +9,7 @@
 #include <mutex>
 #include <filesystem>
 
-#include "..\ThirdParties\httplib.h" // https://github.com/yhirose/cpp-httplib
+#include "../ThirdParties/httplib.h" // https://github.com/yhirose/cpp-httplib
 
 /**
  * @brief A simple HTTP server class to host a static HTML file (index.html).

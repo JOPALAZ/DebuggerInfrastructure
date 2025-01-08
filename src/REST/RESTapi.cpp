@@ -1,7 +1,8 @@
-#include "RESTApi.h"
-#include "..\Logger\Logger.h"
-#include "..\Common\DbHandler.h"
-#include "..\ThirdParties\nlohmann\json.hpp"  // nlohmann::json
+#include "RESTapi.h"
+#include "../Logger/Logger.h"
+#include "../Common/DbHandler.h"
+#include "../ThirdParties/nlohmann/json.hpp"  // nlohmann::json
+#include "../LaserHandler/LaserHandler.h"
 
 // A static pointer to a single DbHandler instance.
 static DbHandler* dbHandler = nullptr;
@@ -67,7 +68,7 @@ void RESTApi::Start()
     serverThread_ = std::thread([this]() {
         RegisterEndpoints();
 
-        Logger::Info(std::format("Starting RESTApi on {}:{}", listenAddress_, port_));
+        Logger::Info("Starting RESTApi on {}:{}", listenAddress_, port_);
         // This call blocks until svr_.stop() is called
         svr_.listen(listenAddress_.c_str(), port_);
         Logger::Info("RESTApi stopped.");
@@ -198,18 +199,18 @@ void RESTApi::RegisterEndpoints()
     // GET /enable
     svr_.Get("/enable", [&](const httplib::Request& req, httplib::Response& res) {
         Logger::Verbose("Handled /enable request");
-
+        LaserHandler::Enable();
         json j;
-        j["message"] = "Enabled set to TRUE (unimplemented logic)";
+        j["message"] = "Enabled";
         res.set_content(j.dump(), "application/json");
     });
 
     // GET /disable
     svr_.Get("/disable", [&](const httplib::Request& req, httplib::Response& res) {
         Logger::Verbose("Handled /disable request");
-
+        LaserHandler::Disable();
         json j;
-        j["message"] = "Enabled set to FALSE (unimplemented logic)";
+        j["message"] = "Disabled";
         res.set_content(j.dump(), "application/json");
     });
         // ----------------------------------------------------------------------------
@@ -270,18 +271,18 @@ void RESTApi::RegisterEndpoints()
             }
 
             // If all records inserted successfully
-            Logger::Info(std::format("POST /data: Inserted {} records.", insertedCount));
+            Logger::Info("POST /data: Inserted {} records.", insertedCount);
 
             // Build a success JSON response
             json jResponse;
             jResponse["status"]  = "OK";
-            jResponse["message"] = std::format("Inserted {} records.", insertedCount);
+            jResponse["message"] = fmt::format("Inserted {} records.", insertedCount);
 
             res.set_content(jResponse.dump(), "application/json");
         }
         catch (std::exception& ex) {
             // JSON parse error or other
-            Logger::Error(std::format("POST /data exception: {}", ex.what()));
+            Logger::Error("POST /data exception: {}", ex.what());
             res.status = 400;
             res.set_content(std::string("Error parsing or inserting data: ") + ex.what(), "text/plain");
         }

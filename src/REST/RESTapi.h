@@ -7,7 +7,7 @@
 #include <chrono>
 #include <mutex>
 
-#include "..\ThirdParties\httplib.h"  // https://github.com/yhirose/cpp-httplib
+#include "../ThirdParties/httplib.h"  // https://github.com/yhirose/cpp-httplib
 class DbHandler;
 /**
  * @brief A simple REST API server that runs on a separate thread,

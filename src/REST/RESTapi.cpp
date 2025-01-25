@@ -3,6 +3,8 @@
 #include "../Common/DbHandler.h"
 #include "../ThirdParties/nlohmann/json.hpp"  // nlohmann::json
 #include "../LaserHandler/LaserHandler.h"
+#include "../ServoHandler/ServoHandler.h"
+#include "../AimHandler/AimHandler.h"
 
 // A static pointer to a single DbHandler instance.
 static DbHandler* dbHandler = nullptr;
@@ -186,6 +188,46 @@ void RESTApi::RegisterEndpoints()
         // Return as JSON with the appropriate content type
         res.set_content(jResponse.dump(), "application/json");
     });
+
+    svr_.Post("/ForceSetServoDebug", [&](const httplib::Request& req, httplib::Response& res) {
+            bool hasAngleX = req.has_param("angleX");
+            bool hasAngleY = req.has_param("angleY");
+            json jResponse;
+            // Helper lambda to parse a query param as int64_t
+            auto parseParam = [&](const std::string& paramName) -> std::optional<int64_t> {
+                try {
+                    return std::stoll(req.get_param_value(paramName));
+                } catch (...) {
+                    return {};
+                }
+            };
+            if(hasAngleX && hasAngleY)
+            {
+                int64_t angleX = parseParam("angleX").value();
+                int64_t angleY = parseParam("angleY").value();
+                try
+                {
+                    AimHandler::SetAnglePoint({angleX, angleY});
+                    jResponse["status"]  = "OK";
+                    jResponse["message"] = "Successfuly set";
+                }
+                catch(std::exception ex)
+                {
+                    jResponse["status"]  = "Error";
+                    jResponse["message"] = fmt::format("Couldn't set angle: {}", ex.what());
+                }
+
+            }
+            else
+            {
+                jResponse["status"]  = "Error";
+                jResponse["message"] = "No angle provided as parameter";
+            }
+
+            // Return as JSON with the appropriate content type
+            res.set_content(jResponse.dump(), "application/json");
+        });
+
 
     // GET /status
     svr_.Get("/status", [&](const httplib::Request& req, httplib::Response& res) {

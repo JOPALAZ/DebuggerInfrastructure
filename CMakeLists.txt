@@ -29,6 +29,7 @@ add_executable(${EXECUTABLE_NAME}
     src/LaserHandler/LaserHandler.cpp
     src/ServoHandler/ServoHandler.cpp
     src/GPIOHandler/GPIOHandler.cpp
+    src/AimHandler/AimHandler.cpp
 )
 
 # Include directories for the target

@@ -7,13 +7,18 @@
 #include <chrono>
 #include <thread>
 
-// Default constructor
+// Pulse width range per specification (500→2500 μs)
+static constexpr double kMinPulseWidthUs = 500.0;
+static constexpr double kMaxPulseWidthUs = 2500.0;
+// Default angular range for the servo: 0..180 degrees
+static constexpr double kMinAngle = 0.0;
+static constexpr double kMaxAngle = 180.0;
+
 ServoHandler::ServoHandler()
 {
-    // Nothing to do here; actual setup is done in Initialize()
+    // Default constructor
 }
 
-// Destructor
 ServoHandler::~ServoHandler()
 {
     Dispose();
@@ -26,15 +31,14 @@ void ServoHandler::Initialize(gpiod_line* line, double frequency)
     if (m_initialized) {
         Logger::Info("ServoHandler is already initialized. Checking consistency...");
 
-        // If it's already initialized on the same pin, do nothing
+        // If it's the same pin, do nothing
         if (m_line == line) {
             Logger::Info("ServoHandler is already using the same pin. Doing nothing.");
             return;
         }
 
-        // Otherwise, consider it an error because the class is already initialized on a different pin
-        std::runtime_error ex(
-            "ServoHandler was already initialized with a different GPIO pin!");
+        // Otherwise, throw an error
+        std::runtime_error ex("ServoHandler was already initialized with a different GPIO pin!");
         Logger::Critical(ex.what());
         throw ex;
     }
@@ -43,14 +47,16 @@ void ServoHandler::Initialize(gpiod_line* line, double frequency)
     m_line      = line;
     m_frequency = frequency;
 
-    // Ensure the pin is LOW initially
+    // Drive the line LOW initially
     if (m_line) {
         gpiod_line_set_value(m_line, 0);
     }
-    m_angle.store(0.0);
-    m_locked = false; // Unlock.
 
-    // Start the thread for generating the PWM signal
+    // By default, set angle to 0°
+    m_angle.store(0.0);
+    m_locked = false; // Unlock by default
+
+    // Start the PWM generation thread
     m_running = true;
     m_pwmThread = std::thread(&ServoHandler::pwmLoop, this);
 
@@ -71,9 +77,9 @@ void ServoHandler::SetAngle(double newAngle)
         return;
     }
 
-    // Clamp the angle to [0..180]
-    if (newAngle < 0.0)   newAngle = 0.0;
-    if (newAngle > 180.0) newAngle = 180.0;
+    // Clamp angle to [0..180];
+    if (newAngle < kMinAngle) newAngle = kMinAngle;
+    if (newAngle > kMaxAngle) newAngle = kMaxAngle;
 
     m_angle.store(newAngle);
 
@@ -82,17 +88,15 @@ void ServoHandler::SetAngle(double newAngle)
 
 void ServoHandler::EmergencyDisableAndLock()
 {
-    std::lock_guard<std::mutex> guard(m_mutex);
-
     if (!m_initialized) {
         return;
     }
 
-    // Set angle to 0
+    // Immediately move to 0°
     m_angle.store(0.0);
 
     Logger::Info("Emergency disabling servo (angle=0).");
-    // Give the PWM thread a little time to actually apply 0
+    // Short delay to let the servo actually move to 0°
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
     // Lock the servo
@@ -115,23 +119,21 @@ void ServoHandler::Unlock()
 
 void ServoHandler::Dispose()
 {
-    std::lock_guard<std::mutex> guard(m_mutex);
-
     if (!m_initialized) {
         // Already disposed
         return;
     }
 
-    // Perform an emergency disable first
+    // Perform an emergency disable for safety
     EmergencyDisableAndLock();
 
-    // Stop the thread
+    // Stop the PWM thread
     m_running = false;
     if (m_pwmThread.joinable()) {
         m_pwmThread.join();
     }
 
-    // Release GPIO resources
+    // Release the GPIO line
     if (m_line) {
         GPIOHandler::ReleaseLine(m_line);
         m_line = nullptr;
@@ -152,27 +154,28 @@ void ServoHandler::pwmLoop()
     using namespace std::chrono;
 
     // Period (seconds) = 1 / frequency
-    // For SG90, typically about 20ms (50Hz)
+    // For many hobby servos, 50 Hz => 20 ms period
     const double periodSec = 1.0 / m_frequency;
     const double periodUs  = periodSec * 1'000'000.0;
 
     while (m_running) {
-        double currentAngle = m_angle.load(); // Atomic read of the angle
+        double currentAngle = m_angle.load(); // Atomic read of current angle
 
-        // Map angle [0..180] to pulse width [1.0..2.0] ms (adjust if necessary)
-        double pulseWidthMs = 1.0 + (currentAngle / 180.0);
-        double pulseWidthUs = pulseWidthMs * 1000.0;
+        // Map angle [0..180] to pulse width [500..2500] µs
+        double pulseWidthUs = kMinPulseWidthUs
+                            + (currentAngle / (kMaxAngle - kMinAngle))
+                            * (kMaxPulseWidthUs - kMinPulseWidthUs);
 
-        // Drive the GPIO line HIGH
+        // Drive GPIO HIGH for the pulse width
         if (m_line) {
             gpiod_line_set_value(m_line, 1);
         }
         std::this_thread::sleep_for(microseconds(static_cast<long>(pulseWidthUs)));
 
-        // Then drive it LOW for the remainder of the period
+        // Drive LOW for the remainder of the period
         double remainderUs = periodUs - pulseWidthUs;
         if (remainderUs < 0) {
-            remainderUs = 0; // In case the angle or frequency is set incorrectly
+            remainderUs = 0; // Safety check in case of invalid config
         }
 
         if (m_line) {
@@ -181,7 +184,7 @@ void ServoHandler::pwmLoop()
         std::this_thread::sleep_for(microseconds(static_cast<long>(remainderUs)));
     }
 
-    // When the loop ends, make sure to drive LOW for safety
+    // At the end of the loop (Dispose called), set pin LOW for safety
     if (m_line) {
         gpiod_line_set_value(m_line, 0);
     }

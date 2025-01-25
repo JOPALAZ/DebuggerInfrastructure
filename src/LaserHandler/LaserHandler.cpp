@@ -42,8 +42,6 @@ void LaserHandler::Initialize(gpiod_line* line)
 
 void LaserHandler::EmergencyDisableAndLock()
 {
-    std::lock_guard<std::mutex> guard(mtx);
-
     // Disable laser and lock it
     LaserHandler::Disable();
     LaserHandler::lock = true;
@@ -90,8 +88,6 @@ void LaserHandler::Disable()
 
 void LaserHandler::Dispose()
 {
-    std::lock_guard<std::mutex> guard(mtx);
-
     // Disable and lock for safety
     LaserHandler::EmergencyDisableAndLock();
 

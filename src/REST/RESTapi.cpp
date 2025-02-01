@@ -5,6 +5,8 @@
 #include "../LaserHandler/LaserHandler.h"
 #include "../ServoHandler/ServoHandler.h"
 #include "../AimHandler/AimHandler.h"
+#include "../ExceptionExtensions/ExceptionExtensions.h"
+
 
 // A static pointer to a single DbHandler instance.
 static DbHandler* dbHandler = nullptr;
@@ -234,25 +236,57 @@ void RESTApi::RegisterEndpoints()
         Logger::Verbose("Handled /status request");
 
         json j;
-        j["status"] = "UNIMPLEMENTED";
+        j["status"] = LaserHandler::GetStatus();
         res.set_content(j.dump(), "application/json");
     });
 
     // GET /enable
-    svr_.Get("/enable", [&](const httplib::Request& req, httplib::Response& res) {
+    svr_.Post("/enable", [&](const httplib::Request& req, httplib::Response& res) {
         Logger::Verbose("Handled /enable request");
-        LaserHandler::Enable();
+        int statusCode = 200;
+        std::string msg;
+        try
+        {
+            msg = LaserHandler::Enable();
+        }
+        catch(BadRequestException ex)
+        {
+            statusCode = 400;
+            msg = ex.what();
+        }
+        catch(std::exception ex)
+        {
+            statusCode = 500;
+            msg = ex.what();
+        }
         json j;
-        j["message"] = "Enabled";
+        j["message"] = msg;
+        res.status = statusCode;
         res.set_content(j.dump(), "application/json");
     });
 
     // GET /disable
-    svr_.Get("/disable", [&](const httplib::Request& req, httplib::Response& res) {
+    svr_.Post("/disable", [&](const httplib::Request& req, httplib::Response& res) {
         Logger::Verbose("Handled /disable request");
-        LaserHandler::Disable();
+        int statusCode = 200;
+        std::string msg;
+        try
+        {
+            msg = LaserHandler::Disable();
+        }
+        catch(BadRequestException ex)
+        {
+            statusCode = 400;
+            msg = ex.what();
+        }
+        catch(std::exception ex)
+        {
+            statusCode = 500;
+            msg = ex.what();
+        }
         json j;
-        j["message"] = "Disabled";
+        j["message"] = msg;
+        res.status = statusCode;
         res.set_content(j.dump(), "application/json");
     });
         // ----------------------------------------------------------------------------

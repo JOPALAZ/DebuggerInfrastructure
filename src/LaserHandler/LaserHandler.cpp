@@ -1,6 +1,7 @@
 #include "LaserHandler.h"
 #include "../Logger/Logger.h"
 #include "../GPIOHandler/GPIOHandler.h"
+#include "../ExceptionExtensions/ExceptionExtensions.h"
 #include <gpiod.h>
 #include <stdexcept>
 #include <string>
@@ -43,7 +44,11 @@ void LaserHandler::Initialize(gpiod_line* line)
 void LaserHandler::EmergencyDisableAndLock()
 {
     // Disable laser and lock it
-    LaserHandler::Disable();
+    try
+    {
+        LaserHandler::Disable();
+    }
+    catch(...){ /*IGNORED*/ }
     LaserHandler::lock = true;
     Logger::Info("Laser is disabled and locked.");
 }
@@ -56,34 +61,68 @@ void LaserHandler::Unlock()
     Logger::Info("Laser is unlocked.");
 }
 
-void LaserHandler::Enable()
+std::string LaserHandler::Enable()
 {
     std::lock_guard<std::mutex> guard(mtx);
-
-    if (!lock)
+    int laserValue = gpiod_line_get_value(line);
+    if(laserValue == 0)
     {
-        gpiod_line_set_value(line, 1);
-        Logger::Info("Laser enabled.");
+        if (!lock)
+        {
+            gpiod_line_set_value(line, 1);
+            return "Laser enabled.";
+        }
+        throw BadRequestException("Laser is locked due to emergency => cannot enable.");   
     }
-    else
+    else if(laserValue == 1)
     {
-        Logger::Info("Attempted to enable laser while locked.");
+        throw BadRequestException("Laser is enabled already.");
     }
+    throw std::runtime_error("Laser is not initialized properly");
 }
 
-void LaserHandler::Disable()
+std::string LaserHandler::Disable()
 {
     std::lock_guard<std::mutex> guard(mtx);
-
-    if (line != nullptr)
+    int laserValue = gpiod_line_get_value(line);
+    if(laserValue == 1)
     {
         gpiod_line_set_value(line, 0);
-        Logger::Info("Laser disabled.");
+        if (!lock)
+        {
+            return "Laser disabled.";
+        }
+        throw BadRequestException("Laser is locked due to emergency, but was disabled anyway for safety");   
     }
-    else
+    else if(laserValue == 0)
     {
-        Logger::Info("Disable called but line is not initialized.");
+        throw BadRequestException("Laser is disabled already.");
     }
+    throw std::runtime_error("Laser is not initialized properly");
+}
+
+std::string LaserHandler::GetStatus()
+{
+    std::string response;
+    int laserValue = gpiod_line_get_value(line);
+    if(!initialized)
+    {
+        return "Uninitialized";
+    }
+    switch (laserValue)
+    {
+    case 1:
+        response = "Enabled";
+        break;
+    case 0:
+        response = "Disabled";
+        break;
+    default:
+        response = "Error";
+        break;
+    }
+    response = lock? response + " (Locked due to an emergency)" : response;
+    return response;
 }
 
 void LaserHandler::Dispose()

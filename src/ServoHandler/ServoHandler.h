@@ -1,90 +1,88 @@
 #pragma once
 
-#include <string>
-#include <thread>
 #include <atomic>
+#include <thread>
 #include <mutex>
 
+// Forward declaration for GPIO line structure
 struct gpiod_line;
 
-/**
- * @brief An instance-based (non-static) class for controlling a servo motor.
- *        Allows multiple independent servo objects on different pins.
+/*
+ * Manages a servo motor using an asynchronous pulse approach.
+ * The servo is driven for a short duration when the angle changes,
+ * rather than being driven continuously.
  */
-class ServoHandler {
+class ServoHandler
+{
 public:
-    /**
-     * @brief Constructor. Note that you can initialize (export the pin and start
-     *        the PWM thread) either here or in a separate Initialize() method.
-     *        In this example, we use a separate Initialize() method.
+    /*
+     * Constructs the servo handler with the specified GPIO line and PWM frequency.
+     * The line is set to LOW initially, and the handler is prepared for angle updates.
      */
-    ServoHandler();
+    ServoHandler(gpiod_line* line, double frequency);
 
-    /**
-     * @brief Destructor. Stops the PWM thread (if running) and releases resources.
+    /*
+     * Destroys the handler by stopping any running pulse thread,
+     * disabling the servo, and releasing the GPIO line.
      */
     ~ServoHandler();
 
-    /**
-     * @brief Initializes the servo on a given GPIO pin (via gpiod_line).
-     * @param line      Pointer to an already opened gpiod_line (pin).
-     * @param frequency PWM frequency (usually ~50 Hz for SG90).
+    /*
+     * Requests a new target angle for the servo.
+     * This starts a thread that sends PWM pulses for a short duration (e.g. 500 ms).
+     * Any previously running thread is stopped before starting a new one.
      */
-    void Initialize(gpiod_line* line, double frequency = 50.0);
+    void SetAngle(double newAngle);
 
-    /**
-     * @brief Sets the servo angle (if not locked).
-     *        The angle is clamped to the range [0..180].
-     */
-    void SetAngle(double angle);
-
-    /**
-     * @brief Emergency disable (sets angle = 0) and lock.
-     *        After this, SetAngle calls are ignored until Unlock() is called.
+    /*
+     * Immediately moves the servo to 0° and locks the servo to prevent further angle changes.
+     * Designed for emergency situations or quick shutdown.
      */
     void EmergencyDisableAndLock();
 
-    /**
-     * @brief Unlocks the servo so SetAngle can be used again.
+    /*
+     * Unlocks the servo so new angles can be applied.
      */
     void Unlock();
 
-    /**
-     * @brief Stops the PWM thread and releases GPIO resources.
-     *        After calling Dispose(), you need to call Initialize() again
-     *        if you want to reuse this servo.
-     */
-    void Dispose();
-
-    /**
-     * @brief Returns whether the servo is currently locked.
+    /*
+     * Indicates whether the servo is currently locked.
      */
     bool IsLocked() const;
 
 private:
-    /**
-     * @brief The function that runs in a separate thread, generating the PWM signal.
+    /*
+     * Sends a train of pulses corresponding to the specified angle, frequency,
+     * and total duration (in milliseconds). Runs in a separate thread.
      */
-    void pwmLoop();
+    void sendPulseTrain(double targetAngle, double frequency, int durationMs);
 
-private:
-    // A mutex to protect object fields from concurrent access
-    mutable std::mutex m_mutex;  
+    /*
+     * Stops a running pulse thread if it is still active.
+     */
+    void stopPulseThreadLocked();
 
-    // State flags
-    bool   m_locked      = true;   ///< If true, SetAngle is ignored
-    bool   m_initialized = false;  ///< Whether the servo is initialized (PWM thread running)
-    bool   m_running     = false;  ///< Whether the PWM thread is currently running
+    // Pointer to the GPIO line used for servo control
+    gpiod_line* m_line;
 
-    // Current servo angle (read periodically by pwmLoop)
-    std::atomic<double> m_angle{0.0};
+    // Frequency for PWM pulses (commonly 50 Hz for many hobby servos)
+    double m_frequency;
 
-    // PWM parameters
-    double      m_frequency = 50.0; ///< PWM frequency in Hz
+    // Indicates whether the handler should continue running
+    bool m_running;
 
-    // GPIO line (libgpiod)
-    gpiod_line* m_line = nullptr;  
+    // Flag that locks the servo angle from further updates
+    bool m_locked;
 
-    // The thread in which the PWM is generated
-    std::thread m_pwmThread;
+    // Atomic flag used to request a stop for the pulse sending thread
+    std::atomic<bool> m_stopThread;
+
+    // Stores the last requested angle in degrees
+    std::atomic<double> m_angle;
+
+    // The thread object used for generating pulses asynchronously
+    std::thread m_pulseThread;
+
+    // Mutex used to protect shared state across threads
+    mutable std::mutex m_mutex;
 };

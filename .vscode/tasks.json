@@ -17,6 +17,7 @@
                 "${workspaceFolder}/src/GPIOHandler/GPIOHandler.cpp",
                 "${workspaceFolder}/src/ServoHandler/ServoHandler.cpp",
                 "${workspaceFolder}/src/AimHandler/AimHandler.cpp",
+                "${workspaceFolder}/src/DeadLocker/DeadLocker.cpp",
                 "-x",
                 "c",
                 "${workspaceFolder}/src/ThirdParties/sqlite3/sqlite3.c",

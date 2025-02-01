@@ -30,6 +30,8 @@ add_executable(${EXECUTABLE_NAME}
     src/ServoHandler/ServoHandler.cpp
     src/GPIOHandler/GPIOHandler.cpp
     src/AimHandler/AimHandler.cpp
+    src/DeadLocker/DeadLocker.cpp
+
 )
 
 # Include directories for the target

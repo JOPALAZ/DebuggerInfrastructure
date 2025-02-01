@@ -65,12 +65,17 @@ public:
      *
      * If @ref lock is true, enabling is ignored.
      */
-    static void Enable();
+    static std::string Enable();
 
     /**
      * @brief Disables the laser (regardless of the lock state).
      */
-    static void Disable();
+    static std::string Disable();
+
+    /**
+     * @brief Gets the status of the laser (regardless of the lock state).
+     */
+    static std::string GetStatus();
 
     /**
      * @brief Disposes of the laser resources safely, disabling and locking the laser.

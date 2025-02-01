@@ -10,6 +10,7 @@
 #include "../REST/RESTapi.h"
 #include "../LaserHandler/LaserHandler.h"
 #include "../AimHandler/AimHandler.h"
+#include "../DeadLocker/DeadLocker.h"
 
 std::string generateGUID() {
     std::random_device rd;
@@ -54,7 +55,7 @@ int main()
     GPIOHandler::RequestLineOutput(LaserLine, "LaserGPIOpin");
     LaserHandler::Initialize(LaserLine);
     AimHandler::Initialize(15,14);
-
+    DeadLocker::Initialize(22);
     DbHandler db;
     
     RESTApi rest(&db,"0.0.0.0",8081);

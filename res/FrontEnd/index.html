@@ -375,41 +375,52 @@
      * Sends a request to enable the feature and updates the UI accordingly.
      */
     async function enableFeature() {
-      try {
-        updateStatus('Activating offensive protocols...', 'loading');
-        const response = await fetch(`${BASE_URL}/enable`);
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+        try {
+            updateStatus('Activating offensive protocols...', 'loading');
+            const response = await fetch(`${BASE_URL}/enable`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.message || `HTTP error! status: ${response.status}`);
+            }
+            showMessage(data.message, 'success');
+            fetchStatus();
+        } catch (error) {
+            console.error('Error calling /enable:', error);
+            showMessage(error.message, 'error');
+            fetchStatus();
         }
-        const data = await response.json();
-        showMessage(data.message, 'success');
-        fetchStatus();
-      } catch (error) {
-        console.error('Error calling /enable:', error);
-        showMessage('Error activating offensive protocols.', 'error');
-        updateStatus('Error activating offensive protocols', 'error');
-      }
     }
 
     /**
      * Sends a request to disable the feature and updates the UI accordingly.
      */
     async function disableFeature() {
-      try {
-        updateStatus('Disabling offensive protocols...', 'loading');
-        const response = await fetch(`${BASE_URL}/disable`);
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+        try {
+            updateStatus('Disabling offensive protocols...', 'loading');
+            const response = await fetch(`${BASE_URL}/disable`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.message || `HTTP error! status: ${response.status}`);
+            }
+            showMessage(data.message, 'success');
+            fetchStatus();
+        } catch (error) {
+            console.error('Error calling /disable:', error);
+            showMessage(error.message, 'error');
+            fetchStatus();
         }
-        const data = await response.json();
-        showMessage(data.message, 'success');
-        fetchStatus();
-      } catch (error) {
-        console.error('Error calling /disable:', error);
-        showMessage('Error disabling offensive protocols.', 'error');
-        updateStatus('Error disabling offensive protocols', 'error');
-      }
     }
+
 
     /**
      * Initializes the page by fetching data and status, and setting up periodic status updates.

@@ -3,6 +3,7 @@
 #include <gpiod.h>
 #include <stdexcept>
 #include <iostream>
+#include <thread>
 
 // Static member definitions
 gpiod_chip*    GPIOHandler::chip        = nullptr;
@@ -98,6 +99,21 @@ void GPIOHandler::RequestLineOutput(gpiod_line *line,
     }
 }
 
+void GPIOHandler::RequestLineInput(gpiod_line *line,
+                                    const std::string &consumer)
+{
+    if (!initialized || !chip) {
+        throw std::runtime_error("GPIOHandler::RequestLineInput() called but chip is not initialized.");
+    }
+    if (!line) {
+        throw std::runtime_error("GPIOHandler::RequestLineInput() called with null line pointer.");
+    }
+
+    if (gpiod_line_request_input(line, consumer.c_str()) < 0) {
+        throw std::runtime_error("Failed to request line as Input. Consumer: " + consumer);
+    }
+}
+
 /**
  * @brief Releases a gpiod_line and sets it to nullptr.
  */
@@ -106,5 +122,13 @@ void GPIOHandler::ReleaseLine(gpiod_line *&line)
     if (line) {
         gpiod_line_release(line);
         line = nullptr;
+    }
+}
+
+void GPIOHandler::WaitForValue(gpiod_line *line, int value, std::atomic<bool>& cycle)
+{
+    while (gpiod_line_get_value(line)!=value && cycle.load())
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 }

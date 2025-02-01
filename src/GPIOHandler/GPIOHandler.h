@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <atomic>
 
 // Forward declarations to avoid pulling in <gpiod.h> here
 struct gpiod_chip;
@@ -46,11 +47,21 @@ public:
     static void RequestLineOutput(gpiod_line *line, const std::string &consumer, int defaultVal = 0);
 
     /**
+     * @brief Requests the specified gpiod_line as input.
+     * @param line        The gpiod_line pointer (must not be null).
+     * @param consumer    A name for the consumer (e.g., "SERVO_gpio").
+     * @throws std::runtime_error on failure.
+     */
+    static void RequestLineInput(gpiod_line *line, const std::string &consumer);
+
+    /**
      * @brief Releases a gpiod_line (sets it to nullptr afterwards).
      * @param line Reference to the pointer to gpiod_line. After this call, line becomes nullptr.
      */
     static void ReleaseLine(gpiod_line *&line);
     
+    static void WaitForValue(gpiod_line *line, int value, std::atomic<bool>& cycle);
+
 private:
     // Delete all constructors and operators to enforce static-only usage.
     GPIOHandler() = delete;

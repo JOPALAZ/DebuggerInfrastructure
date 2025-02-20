@@ -84,7 +84,7 @@ std::string AimHandler::SetAnglePoint(std::pair<double,double> anglePoint)
     {
         CheckIfInitialized("SetAnglePoint(std::pair<double,double> anglePoint)");
     }
-    catch(std::exception ex)
+    catch(std::runtime_error ex)
     {
         throw std::runtime_error(fmt::format("Cannot move servos, internal error: [{}]", ex.what()));
     }

@@ -194,6 +194,8 @@ void RESTApi::RegisterEndpoints()
     svr_.Post("/ForceSetServoDebug", [&](const httplib::Request& req, httplib::Response& res) {
             bool hasAngleX = req.has_param("angleX");
             bool hasAngleY = req.has_param("angleY");
+            int statusCode = 200;
+            std::string msg;
             json jResponse;
             // Helper lambda to parse a query param as int64_t
             auto parseParam = [&](const std::string& paramName) -> std::optional<int64_t> {
@@ -209,24 +211,27 @@ void RESTApi::RegisterEndpoints()
                 int64_t angleY = parseParam("angleY").value();
                 try
                 {
-                    AimHandler::SetAnglePoint({angleX, angleY});
-                    jResponse["status"]  = "OK";
-                    jResponse["message"] = "Successfuly set";
+                    msg = AimHandler::SetAnglePoint({angleX, angleY});
                 }
-                catch(std::exception ex)
+                catch(BadRequestException ex)
                 {
-                    jResponse["status"]  = "Error";
-                    jResponse["message"] = fmt::format("Couldn't set angle: {}", ex.what());
+                    statusCode = 400;
+                    msg = ex.what();
                 }
-
+                catch(std::runtime_error ex)
+                {
+                    statusCode = 500;
+                    msg = ex.what();
+                }
             }
             else
             {
-                jResponse["status"]  = "Error";
-                jResponse["message"] = "No angle provided as parameter";
+                statusCode = 400;
+                msg = "No angle provided as parameter";
             }
 
-            // Return as JSON with the appropriate content type
+            jResponse["message"] = msg;
+            res.status = statusCode;
             res.set_content(jResponse.dump(), "application/json");
         });
 

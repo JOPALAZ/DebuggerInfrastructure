@@ -107,10 +107,52 @@
       background-color: #d60000;
     }
 
-    /* --- MESSAGE SECTION --- */
+    /* --- SERVO CONTROL SECTION --- */
+    .servo-control-container {
+      display: flex;
+      align-items: center;
+      margin-bottom: 30px;
+    }
+    .servo-control-container input {
+      width: 80px;
+      padding: 10px;
+      margin-right: 10px;
+      border: none;
+      border-radius: 8px;
+      background-color: #1a1a1a;
+      color: #ff0000;
+      font-size: 1.1em;
+      text-align: center;
+    }
+    .servo-control-container button {
+      padding: 12px 20px;
+      border: none;
+      border-radius: 8px;
+      background-color: #8b0000;
+      color: #fff;
+      font-size: 1.1em;
+      cursor: pointer;
+      transition: background-color 0.3s, transform 0.2s, box-shadow 0.3s;
+      display: flex;
+      align-items: center;
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.6);
+    }
+    .servo-control-container button:hover {
+      background-color: #b30000;
+      transform: translateY(-4px);
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.7);
+    }
+    .servo-control-container button:active {
+      transform: translateY(0);
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.6);
+    }
+    .servo-control-container button i {
+      margin-right: 10px;
+    }
+
+    /* --- NOTIFICATION (MESSAGE) SECTION --- */
     #message {
       display: none;
-      margin-bottom: 25px;
       padding: 20px 25px;
       border-radius: 10px;
       font-size: 1.2em;
@@ -118,6 +160,10 @@
       box-shadow: 0 6px 12px rgba(0, 0, 0, 0.6);
       transition: background-color 0.3s, color 0.3s;
       text-transform: uppercase;
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
     }
     #message.success {
       background-color: #660000;
@@ -219,13 +265,20 @@
     <i class="fas fa-spinner fa-spin"></i> Status: Loading...
   </div>
 
-  <!-- Displays messages (success or error) -->
+  <!-- Notification Popup (displayed in the top right corner) -->
   <div id="message"></div>
 
   <!-- Buttons to call /enable or /disable endpoints -->
   <div class="btn-container">
     <button onclick="enableFeature()"><i class="fas fa-check"></i> Enable</button>
     <button class="btn-disable" onclick="disableFeature()"><i class="fas fa-times"></i> Disable</button>
+  </div>
+
+  <!-- Servo Control Section -->
+  <div id="servo-control" class="servo-control-container">
+    <input type="number" id="angleX" placeholder="Angle X" min="0" max="180">
+    <input type="number" id="angleY" placeholder="Angle Y" min="0" max="180">
+    <button onclick="setServoAngles()"><i class="fas fa-sync"></i> Set Servo Angles</button>
   </div>
 
   <!-- Table to display data fetched from /data -->
@@ -283,7 +336,7 @@
     }
 
     /**
-     * Displays a message in the message section.
+     * Displays a popup notification in the top right corner.
      * @param {string} message - The message to display.
      * @param {string} type - The type of message ('success', 'error').
      */
@@ -375,52 +428,90 @@
      * Sends a request to enable the feature and updates the UI accordingly.
      */
     async function enableFeature() {
-        try {
-            updateStatus('Activating offensive protocols...', 'loading');
-            const response = await fetch(`${BASE_URL}/enable`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            });
-            const data = await response.json();
-            if (!response.ok) {
-                throw new Error(data.message || `HTTP error! status: ${response.status}`);
-            }
-            showMessage(data.message, 'success');
-            fetchStatus();
-        } catch (error) {
-            console.error('Error calling /enable:', error);
-            showMessage(error.message, 'error');
-            fetchStatus();
+      try {
+        updateStatus('Activating offensive protocols...', 'loading');
+        const response = await fetch(`${BASE_URL}/enable`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.message || `HTTP error! status: ${response.status}`);
         }
+        showMessage(data.message, 'success');
+        fetchStatus();
+      } catch (error) {
+        console.error('Error calling /enable:', error);
+        showMessage(error.message, 'error');
+        fetchStatus();
+      }
     }
 
     /**
      * Sends a request to disable the feature and updates the UI accordingly.
      */
     async function disableFeature() {
-        try {
-            updateStatus('Disabling offensive protocols...', 'loading');
-            const response = await fetch(`${BASE_URL}/disable`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            });
-            const data = await response.json();
-            if (!response.ok) {
-                throw new Error(data.message || `HTTP error! status: ${response.status}`);
-            }
-            showMessage(data.message, 'success');
-            fetchStatus();
-        } catch (error) {
-            console.error('Error calling /disable:', error);
-            showMessage(error.message, 'error');
-            fetchStatus();
+      try {
+        updateStatus('Disabling offensive protocols...', 'loading');
+        const response = await fetch(`${BASE_URL}/disable`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.message || `HTTP error! status: ${response.status}`);
         }
+        showMessage(data.message, 'success');
+        fetchStatus();
+      } catch (error) {
+        console.error('Error calling /disable:', error);
+        showMessage(error.message, 'error');
+        fetchStatus();
+      }
     }
 
+    /**
+     * Sends a request to set the servo angles.
+     * Reads the values from the input fields and validates that they are between 0 and 180.
+     * Then sends a POST request to `${BASE_URL}/ForceSetServoDebug?angleX=X&angleY=Y`.
+     * The response message from the endpoint is displayed.
+     */
+    async function setServoAngles() {
+      const angleXInput = document.getElementById('angleX');
+      const angleYInput = document.getElementById('angleY');
+      const angleX = parseInt(angleXInput.value);
+      const angleY = parseInt(angleYInput.value);
+
+      if (isNaN(angleX) || isNaN(angleY) || angleX < 0 || angleX > 180 || angleY < 0 || angleY > 180) {
+        showMessage("Invalid angle values! Please enter a number between 0 and 180.", "error");
+        return;
+      }
+
+      // Build the URL with the specified angle values.
+      const url = `${BASE_URL}/ForceSetServoDebug?angleX=${angleX}&angleY=${angleY}`;
+
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.message || `HTTP error! status: ${response.status}`);
+        }
+        // Display the message returned by the endpoint.
+        showMessage(data.message || "Servo angles successfully set.", "success");
+      } catch (error) {
+        console.error("Error setting servo angles:", error);
+        showMessage(error.message || "Error setting servo angles.", "error");
+      }
+    }
 
     /**
      * Initializes the page by fetching data and status, and setting up periodic status updates.

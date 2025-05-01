@@ -1,6 +1,7 @@
 #include "LaserHandler.h"
 #include "../Logger/Logger.h"
 #include "../GPIOHandler/GPIOHandler.h"
+#include "../DeadLocker/DeadLocker.h"
 #include "../ExceptionExtensions/ExceptionExtensions.h"
 #include <gpiod.h>
 #include <stdexcept>
@@ -121,7 +122,12 @@ std::string LaserHandler::GetStatus()
         response = "Error";
         break;
     }
-    response = lock? response + " (Locked due to an emergency)" : response;
+    std::string reasons;
+    for(std::string el : DeadLocker::lockReasons)
+    {
+        reasons += " " + el + " ";
+    }
+    response = lock? response + " (Locked due to an emergency)" + reasons : response;
     return response;
 }
 

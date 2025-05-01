@@ -106,7 +106,7 @@ bool AimHandler::SetY(double angle)
 
 std::string AimHandler::SetPoint(std::pair<double,double> anglePoint)
 {
-    throw std::runtime_error("UNIMPLIMENTED");
+    Logger::Error("std::string AimHandler::SetPoint(std::pair<double,double> anglePoint) is not yet IMPLIMENTED");
 }
 
 void AimHandler::EmergencyDisableAndLock()

@@ -11,6 +11,7 @@
 #include "../LaserHandler/LaserHandler.h"
 #include "../AimHandler/AimHandler.h"
 #include "../DeadLocker/DeadLocker.h"
+#include "../NeuralNetworkHandler/NeuralNetworkHandler.h"
 
 std::string generateGUID() {
     std::random_device rd;
@@ -92,6 +93,7 @@ int main()
     Logger::Verbose("TEST VRB"); 
     rest.Start();
     front.Start();
+    NeuralNetworkHandler::Initialize("./res/Model/model.ncnn.param", "./res/Model/model.ncnn.bin");
     for(;;)
     {
         std::this_thread::sleep_for(std::chrono::seconds(600));

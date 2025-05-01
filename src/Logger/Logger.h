@@ -11,7 +11,7 @@
 #include <ctime>
 #include <fmt/format.h>
 #include <fmt/core.h>
-
+#define NAMEOF(name) #name
 /**
  * @brief A simple Logger class that writes messages to both a file and console (based on severities).
  */

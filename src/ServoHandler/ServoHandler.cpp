@@ -7,146 +7,89 @@
 #include <chrono>
 #include <thread>
 
-// Defines the minimum and maximum pulse widths, in microseconds
-static constexpr double kMinPulseWidthUs = 500.0;
-static constexpr double kMaxPulseWidthUs = 2500.0;
-
-// Defines the minimum and maximum angles for the servo in degrees
-static constexpr double kMinAngle = 0.0;
-static constexpr double kMaxAngle = 180.0;
-
-ServoHandler::ServoHandler(gpiod_line* line, double frequency)
-    : m_line(line)
-    , m_frequency(frequency)
-    , m_running(true)
+ServoHandler::ServoHandler(int pwmChip, int pwmChannel, double frequency)
+    : m_pwmChip(pwmChip)
+    , m_pwmChannel(pwmChannel)
     , m_locked(false)
-    , m_stopThread(false)
 {
-    // Sets the initial state of the servo pin to LOW
-    if (m_line) {
-        gpiod_line_set_value(m_line, 0);
-    }
+    m_basePath = "/sys/class/pwm/pwmchip" + std::to_string(m_pwmChip);
+    writeSysfs(m_basePath + "/export", std::to_string(m_pwmChannel));
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
-    // Starts with an angle of 0°
-    m_angle.store(0.0);
+    m_basePath += "/pwm" + std::to_string(m_pwmChannel);
 
-    Logger::Info("ServoHandler constructed and initialized.");
+    m_periodNs = (1.0 / frequency) * 1e9;
+    writeSysfs(m_basePath + "/period", std::to_string(static_cast<long>(m_periodNs)));
+    writeSysfs(m_basePath + "/enable", "1");
+
+    SetAngle(0.0);
+    Logger::Info("ServoHandler initialized with hardware PWM.");
 }
 
 ServoHandler::~ServoHandler()
 {
     {
         std::lock_guard<std::mutex> guard(m_mutex);
-        m_running = false;
-        // Moves servo to 0°, small delay if needed
-        m_angle.store(0.0);
         m_locked = true;
     }
 
-    stopPulseThreadLocked();
+    writeSysfs(m_basePath + "/enable", "0");
 
-    if (m_line) {
-        GPIOHandler::ReleaseLine(m_line);
-        m_line = nullptr;
-    }
+    std::string chipPath = "/sys/class/pwm/pwmchip" + std::to_string(m_pwmChip);
+    writeSysfs(chipPath + "/unexport", std::to_string(m_pwmChannel));
 
-    Logger::Info("ServoHandler destroyed and resources released.");
+    Logger::Info("ServoHandler destroyed and PWM unexported.");
 }
 
 void ServoHandler::SetAngle(double newAngle)
 {
     std::lock_guard<std::mutex> guard(m_mutex);
-
     if (m_locked) {
-        Logger::Info("SetAngle called, but the servo is locked.");
+        Logger::Info("SetAngle ignored: servo is locked.");
         return;
     }
 
     if (newAngle < kMinAngle) newAngle = kMinAngle;
     if (newAngle > kMaxAngle) newAngle = kMaxAngle;
 
-    m_angle.store(newAngle);
-    Logger::Info("Servo angle set to " + std::to_string(newAngle) + " degrees.");
+    double pulseUs = kMinPulseWidthUs +
+                     (newAngle / (kMaxAngle - kMinAngle)) *
+                     (kMaxPulseWidthUs - kMinPulseWidthUs);
+    long dutyNs = static_cast<long>(pulseUs * 1000.0);
 
-    stopPulseThreadLocked();
-    m_stopThread = false;
-    m_pulseThread = std::thread(&ServoHandler::sendPulseTrain, this, newAngle, m_frequency, 500);
+    writeSysfs(m_basePath + "/duty_cycle", std::to_string(dutyNs));
+    Logger::Info("Servo angle set to " + std::to_string(newAngle) + " degrees.");
 }
 
 void ServoHandler::EmergencyDisableAndLock()
 {
     {
         std::lock_guard<std::mutex> guard(m_mutex);
-        m_angle.store(0.0);
-        Logger::Info("Emergency disabling servo (angle=0).");
+        writeSysfs(m_basePath + "/duty_cycle",
+                   std::to_string(static_cast<long>(kMinPulseWidthUs * 1000.0)));
         m_locked = true;
     }
-
-    // Brief pause to allow the servo to move
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    Logger::Info("Servo is locked after emergency disable.");
+    Logger::Info("Emergency disable: servo locked at 0°.");
 }
 
 void ServoHandler::Unlock()
 {
     std::lock_guard<std::mutex> guard(m_mutex);
     m_locked = false;
-    Logger::Info("Servo is unlocked.");
+    Logger::Info("Servo unlocked.");
 }
 
-bool ServoHandler::IsLocked() const
+bool ServoHandler::IsLocked()
 {
     std::lock_guard<std::mutex> guard(m_mutex);
     return m_locked;
 }
 
-void ServoHandler::sendPulseTrain(double targetAngle, double frequency, int durationMs)
+void ServoHandler::writeSysfs(const std::string &path, const std::string &value)
 {
-    using namespace std::chrono;
-    std::lock_guard<std::mutex> lock(m_mutex);
-    
-    int cycleCount = static_cast<int>((frequency * durationMs) / 1000.0);
-    double periodUs = (1.0 / frequency) * 1'000'000.0;
-
-    for (int i = 0; i < cycleCount; ++i) {
-        {
-            if (!m_running || m_stopThread) {
-                break;
-            }
-        }
-
-        double pulseWidthUs = kMinPulseWidthUs
-                            + (targetAngle / (kMaxAngle - kMinAngle))
-                            * (kMaxPulseWidthUs - kMinPulseWidthUs);
-
-        if (m_line) {
-            gpiod_line_set_value(m_line, 1);
-        }
-        std::this_thread::sleep_for(microseconds(static_cast<long>(pulseWidthUs)));
-
-        double remainderUs = periodUs - pulseWidthUs;
-        if (remainderUs < 0) {
-            remainderUs = 0;
-        }
-
-        if (m_line) {
-            gpiod_line_set_value(m_line, 0);
-        }
-        std::this_thread::sleep_for(microseconds(static_cast<long>(remainderUs)));
+    std::ofstream fs(path);
+    if (!fs.is_open()) {
+        throw std::runtime_error("Failed to open " + path);
     }
-
-    if (m_line) {
-        gpiod_line_set_value(m_line, 0);
-    }
-
-    Logger::Info("sendPulseTrain finished for angle=" + std::to_string(targetAngle));
-}
-
-void ServoHandler::stopPulseThreadLocked()
-{
-    if (m_pulseThread.joinable()) {
-        m_stopThread = true;
-        m_pulseThread.join();
-        m_stopThread = false;
-    }
+    fs << value;
 }

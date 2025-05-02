@@ -54,8 +54,8 @@ void FrontEnd::Start()
 
                 content = std::regex_replace(
                     content,
-                    std::regex(R"(const BASE_URL = 'REPLACEMEPLEASE';)"), // Pattern to replace
-                    "const BASE_URL = '" + restUrl + "';"               // Replacement value
+                    std::regex(R"(REPLACEMEPLEASE)"), // Pattern to replace
+                    restUrl               // Replacement value
                 );
 
                 // Respond with the modified HTML content

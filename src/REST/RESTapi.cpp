@@ -6,6 +6,7 @@
 #include "../ServoHandler/ServoHandler.h"
 #include "../AimHandler/AimHandler.h"
 #include "../ExceptionExtensions/ExceptionExtensions.h"
+#include "../NeuralNetworkHandler/NeuralNetworkHandler.h"
 
 
 // A static pointer to a single DbHandler instance.
@@ -367,5 +368,24 @@ void RESTApi::RegisterEndpoints()
             res.status = 400;
             res.set_content(std::string("Error parsing or inserting data: ") + ex.what(), "text/plain");
         }
+    });
+    svr_.Get("/video", [&](const httplib::Request& req, httplib::Response& res) {
+        res.set_header("Connection", "close");
+        res.set_content_provider(
+            "multipart/x-mixed-replace; boundary=frame",
+            [&](size_t /*offset*/, httplib::DataSink& sink) {
+                auto frame = NeuralNetworkHandler::GetLatestFrame();
+                std::vector<uchar> buf;
+                cv::imencode(".jpg", frame, buf);
+                std::ostringstream header;
+                header << "--frame\r\n"
+                       << "Content-Type: image/jpeg\r\n"
+                       << "Content-Length: " << buf.size() << "\r\n\r\n";
+                sink.write(header.str().data(), header.str().size());
+                sink.write(reinterpret_cast<char*>(buf.data()), buf.size());
+                sink.write("\r\n", 2);
+                return true;
+            }
+        );
     });
 }

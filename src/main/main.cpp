@@ -55,7 +55,7 @@ int main()
     gpiod_line* LaserLine = GPIOHandler::GetLine(16);
     GPIOHandler::RequestLineOutput(LaserLine, "LaserGPIOpin");
     LaserHandler::Initialize(LaserLine);
-    AimHandler::Initialize(15,14);
+    AimHandler::Initialize(0,0,1);
     DeadLocker::Initialize(22);
     DbHandler db;
     

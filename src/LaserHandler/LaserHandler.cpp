@@ -127,7 +127,7 @@ std::string LaserHandler::GetStatus()
     {
         reasons += " " + el + " ";
     }
-    response = lock? response + " (Locked due to an emergency)" + reasons : response;
+    response = lock? response + ". Locked due to an emergency (Reasons:" + reasons + ")" : response;
     return response;
 }
 

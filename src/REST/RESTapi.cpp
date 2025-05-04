@@ -1,6 +1,6 @@
 #include "RESTapi.h"
 #include "../Logger/Logger.h"
-#include "../Common/DbHandler.h"
+#include "../DbHandler/DbHandler.h"
 #include "../ThirdParties/nlohmann/json.hpp"  // nlohmann::json
 #include "../LaserHandler/LaserHandler.h"
 #include "../ServoHandler/ServoHandler.h"
@@ -235,7 +235,49 @@ void RESTApi::RegisterEndpoints()
             res.status = statusCode;
             res.set_content(jResponse.dump(), "application/json");
         });
+        svr_.Post("/ForceSetServoDebugPoint", [&](const httplib::Request& req, httplib::Response& res) {
+            bool hasAngleX = req.has_param("X");
+            bool hasAngleY = req.has_param("Y");
+            int statusCode = 200;
+            std::string msg;
+            json jResponse;
+            // Helper lambda to parse a query param as int64_t
+            auto parseParam = [&](const std::string& paramName) -> std::optional<double> {
+                try {
+                    return std::stod(req.get_param_value(paramName));
+                } catch (...) {
+                    return {};
+                }
+            };
+            if(hasAngleX && hasAngleY)
+            {
+                double X = parseParam("X").value();
+                double Y = parseParam("Y").value();
+                try
+                {
+                    msg = AimHandler::SetPoint({X, Y});
+                }
+                catch(BadRequestException ex)
+                {
+                    statusCode = 400;
+                    msg = ex.what();
+                }
+                catch(std::runtime_error ex)
+                {
+                    statusCode = 500;
+                    msg = ex.what();
+                }
+            }
+            else
+            {
+                statusCode = 400;
+                msg = "No angle provided as parameter";
+            }
 
+            jResponse["message"] = msg;
+            res.status = statusCode;
+            res.set_content(jResponse.dump(), "application/json");
+        });
 
     // GET /status
     svr_.Get("/status", [&](const httplib::Request& req, httplib::Response& res) {

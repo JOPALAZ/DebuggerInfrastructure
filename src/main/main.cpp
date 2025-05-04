@@ -6,7 +6,7 @@
 #include "../GPIOHandler/GPIOHandler.h"
 #include "../ServoHandler/ServoHandler.h"
 #include "../Logger/Logger.h"
-#include "../Common/DbHandler.h"
+#include "../DbHandler/DbHandler.h"
 #include "../REST/RESTapi.h"
 #include "../LaserHandler/LaserHandler.h"
 #include "../AimHandler/AimHandler.h"
@@ -55,7 +55,7 @@ int main()
     gpiod_line* LaserLine = GPIOHandler::GetLine(16);
     GPIOHandler::RequestLineOutput(LaserLine, "LaserGPIOpin");
     LaserHandler::Initialize(LaserLine);
-    AimHandler::Initialize(0,0,1);
+    AimHandler::Initialize();
     DeadLocker::Initialize(22);
     DbHandler db;
     

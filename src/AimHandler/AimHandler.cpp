@@ -9,8 +9,10 @@ ServoHandler* AimHandler::YServoPtr = nullptr;
 std::pair<double, double> AimHandler::lastState = {0,0};
 bool AimHandler::m_initialized = false;
 bool AimHandler::locked = false;
+CalibrationSettings AimHandler::calbration;
 
-void AimHandler::Initialize(int pwmChip, int xChannel, int yChannel)
+
+void AimHandler::Initialize(int pwmChip, int xChannel, int yChannel, std::string calibrationPath)
 {
     std::lock_guard<std::mutex> guard(mtx);
 
@@ -18,11 +20,40 @@ void AimHandler::Initialize(int pwmChip, int xChannel, int yChannel)
         Logger::Info("AimHandler already initialized");
         return;
     }
-
+    calbration = ExternalConfigsHelper::getOrCreateCalibrationSettings(calibrationPath);
     XServoPtr = new ServoHandler(pwmChip, xChannel, 50.0);
     YServoPtr = new ServoHandler(pwmChip, yChannel, 50.0);
     m_initialized = true;
 }
+
+std::string AimHandler::SetPoint(std::pair<double, double> point)
+{
+    if (locked) throw BadRequestException("Servos locked, cannot move.");
+
+    if (point.first < 0.0 || point.first > 1.0 || point.second < 0.0 || point.second > 1.0)
+        throw BadRequestException("Invalid point. Must be in range [0, 1].");
+
+    double angleX;
+    if (point.first < 0.5) {
+        angleX = AimHandler::calbration.calibrationX.first + 
+                 (AimHandler::calbration.calibrationCenter.first - AimHandler::calbration.calibrationX.first) * (point.first / 0.5);
+    } else {
+        angleX = AimHandler::calbration.calibrationCenter.first + 
+                 (AimHandler::calbration.calibrationX.second - AimHandler::calbration.calibrationCenter.first) * ((point.first - 0.5) / 0.5);
+    }
+
+    double angleY;
+    if (point.second < 0.5) {
+        angleY = AimHandler::calbration.calibrationY.first + 
+                 (AimHandler::calbration.calibrationCenter.second - AimHandler::calbration.calibrationY.first) * (point.second / 0.5);
+    } else {
+        angleY = AimHandler::calbration.calibrationCenter.second + 
+                 (AimHandler::calbration.calibrationY.second - AimHandler::calbration.calibrationCenter.second) * ((point.second - 0.5) / 0.5);
+    }
+
+    return SetAnglePoint({angleX, angleY});
+}
+
 
 void AimHandler::CheckIfInitialized(std::string methodName)
 {

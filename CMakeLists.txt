@@ -27,7 +27,7 @@ find_package(Threads REQUIRED)
 add_executable(${EXECUTABLE_NAME}
     src/main/main.cpp
     src/Logger/Logger.cpp
-    src/Common/DbHandler.cpp
+    src/DbHandler/DbHandler.cpp
     src/REST/RESTapi.cpp
     src/FrontEnd/FrontEnd.cpp
     src/LaserHandler/LaserHandler.cpp
@@ -36,6 +36,7 @@ add_executable(${EXECUTABLE_NAME}
     src/AimHandler/AimHandler.cpp
     src/DeadLocker/DeadLocker.cpp
     src/NeuralNetworkHandler/NeuralNetworkHandler.cpp
+    src/ExternalConfigsHelper/ExternalConfigsHelper.cpp
 )
 
 # Include directories for the target

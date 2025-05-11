@@ -69,7 +69,7 @@ void ServoHandler::EmergencyDisableAndLock()
                    std::to_string(static_cast<long>(kMinPulseWidthUs * 1000.0)));
         m_locked = true;
     }
-    Logger::Info("Emergency disable: servo locked at 0°.");
+    Logger::Info("Emergency disable: servo locked at 0 degrees.");
 }
 
 void ServoHandler::Unlock()

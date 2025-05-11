@@ -13,8 +13,8 @@
 
 class DeadLocker {
 public:
-    // lineOffset — GPIO line for emergency button
-    // unlockDelayMs — delay after “Recover” before final unlock
+    // lineOffset - GPIO line for emergency button
+    // unlockDelayMs - delay after “Recover” before final unlock
     static void Initialize(int lineOffset);
     static void Dispose();
     static bool IsLocked();

@@ -23,15 +23,15 @@ std::string safeConvertToString(const unsigned char* input) {
 //----------------------------------------------
 // RecordData definitions
 //----------------------------------------------
-RecordData::RecordData(sqlite_int64 time, int event, const unsigned char* className, const unsigned char* outcome)
+RecordData::RecordData(sqlite_int64 time, int event, const unsigned char* className, const unsigned char* description)
     : time(time), event(event)
 {
     this->className = safeConvertToString(className);
-    this->outcome   = safeConvertToString(outcome);
+    this->description   = safeConvertToString(description);
 }
 
-RecordData::RecordData(int64_t time, int event, const std::string& className, const std::string& outcome)
-    : time(time), event(event), className(className), outcome(outcome)
+RecordData::RecordData(int64_t time, int event, const std::string& className, const std::string& description)
+    : time(time), event(event), className(className), description(description)
 {
 }
 
@@ -72,22 +72,37 @@ DbHandler::~DbHandler()
 //----------------------------------------------
 // InsertData (buffered)
 //----------------------------------------------
-void DbHandler::InsertData(int64_t time, int event, const std::string& className, const std::string& outcome)
+void DbHandler::InsertData(int64_t time, int event, const std::string& className, const std::string& description)
 {
     // Lock to protect shared resources
     std::lock_guard<std::mutex> lock(mutex_);
 
     // Add the record to the in-memory buffer
-    buffer_.push_back(RecordData(time, event, className, outcome));
+    buffer_.push_back(RecordData(time, event, className, description));
 
     // Check if we need to flush now
     MaybeFlush();
 }
 
+void DbHandler::InsertData(int64_t time, Event event, const std::string& className, const std::string& description)
+{
+    DbHandler::InsertData(time, (int)(event), className, description);
+}
+
+void DbHandler::InsertDataNow(int event, const std::string& className, const std::string& description)
+{
+    DbHandler::InsertData(std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()), event, className, description);
+}
+
+void DbHandler::InsertDataNow(Event event, const std::string& className, const std::string& description)
+{
+    DbHandler::InsertDataNow((int)(event), className, description);
+}
+
 void DbHandler::InsertData(RecordData record)
 {
     // Just reuse the other InsertData
-    InsertData(record.time, record.event, record.className, record.outcome);
+    InsertData(record.time, record.event, record.className, record.description);
 }
 
 //----------------------------------------------
@@ -205,10 +220,10 @@ void DbHandler::CreateTableIfNeeded()
 {
     const char* sql = R"(
         CREATE TABLE IF NOT EXISTS Events (
-            TIME    INTEGER NOT NULL,
-            EVENT   INTEGER NOT NULL,
-            CLASS   TEXT    NOT NULL,
-            OUTCOME TEXT    NOT NULL
+            TIME        INTEGER NOT NULL,
+            EVENT       INTEGER NOT NULL,
+            CLASS       TEXT    NOT NULL,
+            DESCRIPTION TEXT    NOT NULL
         );
     )";
 
@@ -271,7 +286,7 @@ void DbHandler::FlushBuffer()
     }
 
     // Prepare statement for multiple inserts
-    const char* sql = "INSERT INTO Events (TIME, EVENT, CLASS, OUTCOME) VALUES (?, ?, ?, ?);";
+    const char* sql = "INSERT INTO Events (TIME, EVENT, CLASS, DESCRIPTION) VALUES (?, ?, ?, ?);";
     sqlite3_stmt* stmt = nullptr;
 
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
@@ -285,7 +300,7 @@ void DbHandler::FlushBuffer()
         sqlite3_bind_int64(stmt, 1, record.time);
         sqlite3_bind_int   (stmt, 2, record.event);
         sqlite3_bind_text  (stmt, 3, record.className.c_str(), -1, SQLITE_STATIC);
-        sqlite3_bind_text  (stmt, 4, record.outcome.c_str(),   -1, SQLITE_STATIC);
+        sqlite3_bind_text  (stmt, 4, record.description.c_str(),   -1, SQLITE_STATIC);
 
         if (sqlite3_step(stmt) != SQLITE_DONE) {
             Logger::Error("Error inserting data: {}", sqlite3_errmsg(db));

@@ -297,6 +297,7 @@
   <div class="btn-container">
     <button onclick="enableFeature()"><i class="fas fa-check"></i> Enable</button>
     <button class="btn-disable" onclick="disableFeature()"><i class="fas fa-times"></i> Disable</button>
+    <button class="btn-calibration" onclick="togleCalibration()"><i class="fas fa-crosshairs"></i> Toggle Calibration</button>
   </div>
 
   <!-- Servo Control Section -->
@@ -443,8 +444,8 @@
           row.appendChild(classNameCell);
 
           const outcomeCell = document.createElement('td');
-          outcomeCell.textContent = record.outcome;
-          outcomeCell.setAttribute('data-label', 'Outcome');
+          outcomeCell.textContent = record.description;
+          outcomeCell.setAttribute('data-label', 'Description');
           row.appendChild(outcomeCell);
 
           tbody.appendChild(row);
@@ -475,6 +476,31 @@
         fetchStatus();
       } catch (error) {
         console.error('Error calling /enable:', error);
+        showMessage(error.message, 'error');
+        fetchStatus();
+      }
+    }
+
+    /**
+     * Sends a request to disable the feature and updates the UI accordingly.
+     */
+    async function togleCalibration() {
+      try {
+        updateStatus('Entering calibratrion mode...', 'loading');
+        const response = await fetch(`${BASE_URL}/ToggleLaserForCalibration`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.message || `HTTP error! status: ${response.status}`);
+        }
+        showMessage(data.message, 'success');
+        fetchStatus();
+      } catch (error) {
+        console.error('Error calling /disable:', error);
         showMessage(error.message, 'error');
         fetchStatus();
       }
@@ -544,6 +570,28 @@
       }
     }
 
+    // Click on live feed image to send normalized coordinates as ForceSetPoint
+    document.getElementById('live-feed').addEventListener('click', async function(event) {
+      const rect = this.getBoundingClientRect();
+      const x = (event.clientX - rect.left) / rect.width;
+      const y = (event.clientY - rect.top) / rect.height;
+
+      if (x < 0 || x > 1 || y < 0 || y > 1) return;
+
+      const url = `${BASE_URL}/ForceSetPoint?pointX=${x}&pointY=${y}`;
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || `HTTP error! status: ${response.status}`);
+        showMessage(data.message || `Set point to (${x.toFixed(3)}, ${y.toFixed(3)})`, "success");
+      } catch (error) {
+        showMessage(error.message || "Error setting point.", "error");
+      }
+    });
+
     /**
      * Initializes the page by fetching data and status, and setting up periodic status updates.
      */
@@ -551,6 +599,7 @@
       fetchData();
       fetchStatus();
       setInterval(fetchStatus, 30000); // Update status every 30 seconds
+      setInterval(fetchData, 30000);   // Update table every 30 seconds
     })();
   </script>
 

@@ -10,12 +10,13 @@
 #include "../Logger/Logger.h"
 
 
+class DbHandler;
 
 class DeadLocker {
 public:
     // lineOffset - GPIO line for emergency button
     // unlockDelayMs - delay after "Recover" before final unlock
-    static void Initialize(int lineOffset);
+    static void Initialize(DbHandler* db, int lineOffset);
     static void Dispose();
     static bool IsLocked();
     static void EmergencyInitiate(const std::string& caller);
@@ -27,6 +28,7 @@ private:
     static void unlockNow();
 
     static gpiod_line* ButtonLine;
+    static DbHandler* dbHandler;
     static std::thread thrd;
     static std::atomic<bool> cycle;
     static std::atomic<bool> locked;

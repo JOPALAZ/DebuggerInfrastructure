@@ -1,6 +1,6 @@
 description: Ultralytics YOLO11n model trained on data.yaml
 author: Ultralytics
-date: '2025-05-01T19:25:46.088124'
+date: '2025-07-16T18:55:24.121869'
 version: 8.3.94
 license: AGPL-3.0 License (https://ultralytics.com/license)
 docs: https://docs.ultralytics.com
@@ -12,9 +12,8 @@ imgsz:
 - 512
 names:
   0: person
-  1: cat
-  2: dog
-  3: insect
+  1: pet
+  2: insect
 args:
   batch: 1
   half: false

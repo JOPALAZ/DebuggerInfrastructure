@@ -2,6 +2,7 @@
 #include "../GPIOHandler/GPIOHandler.h"
 #include "../AimHandler/AimHandler.h"
 #include "../LaserHandler/LaserHandler.h"
+#include "../DbHandler/DbHandler.h"
 
 gpiod_line*                                         DeadLocker::ButtonLine   = nullptr;
 std::thread                                         DeadLocker::thrd;
@@ -13,12 +14,14 @@ std::mutex                                          DeadLocker::mtx;
 std::unordered_map<std::string, std::thread>        DeadLocker::unlockThrdPool;
 std::unordered_map<std::string, std::atomic<std::chrono::_V2::system_clock::time_point>>  DeadLocker::cancelUnlockMap;
 std::unordered_map<std::string, std::atomic<bool>>  DeadLocker::resolvingMap;
+DbHandler*                                          DeadLocker::dbHandler = nullptr;
 
-void DeadLocker::Initialize(int lineOffset) {
+void DeadLocker::Initialize(DbHandler* db, int lineOffset) {
     ButtonLine    = GPIOHandler::GetLine(lineOffset);
     GPIOHandler::RequestLineInput(ButtonLine, "EmergencyButtonGPIO");
     cycle.store(true);
     thrd = std::thread(threadFunc);
+    dbHandler = db;
 }
 
 void DeadLocker::Dispose() {
@@ -41,8 +44,11 @@ void DeadLocker::EmergencyInitiate(const std::string& caller) {
     std::lock_guard<std::mutex> lk(mtx);
     if (lockReasons.empty()) {
         locked.store(true);
-        LaserHandler::EmergencyDisableAndLock();
         AimHandler::EmergencyDisableAndLock();
+        if(caller != NAMEOF(main))
+        {
+            dbHandler->InsertDataNow(EMERGENCYLOCK, NAMEOF(DeadLocker), "System was locked because of an emergency.");
+        }
     }
     cancelUnlockMap[caller].store(std::chrono::system_clock::now());
     lockReasons.insert(caller);
@@ -68,6 +74,7 @@ void DeadLocker::Recover(const std::string& caller) {
                 if(DeadLocker::lockReasons.empty())
                 {
                     DeadLocker::unlockNow();
+                    dbHandler->InsertDataNow(EMERGENCYUNLOCK, NAMEOF(DeadLocker), "All emergencies were cleared. System recovered.");
                 }
             }
             DeadLocker::resolvingMap[caller].store(false);
@@ -89,17 +96,20 @@ void DeadLocker::unlockNow() {
 void DeadLocker::threadFunc() {
     auto lastReleased = std::chrono::system_clock::now();
     while (cycle.load()) {
-        if (!gpiod_line_get_value(ButtonLine)) {
-            EmergencyInitiate("DeadLocker");
+        if (!gpiod_line_get_value(ButtonLine) && !lockReasons.contains(NAMEOF(DeadLocker))) {
+            EmergencyInitiate(NAMEOF(DeadLocker));
+            dbHandler->InsertDataNow(EMERGENCYADDLOCKREASON, NAMEOF(DeadLocker), "The Emergency Button was pressed.");
             GPIOHandler::WaitForValue(ButtonLine, true, cycle);
             lastReleased = std::chrono::system_clock::now();
         } else {
             auto now = std::chrono::system_clock::now();
             if (locked.load() &&
                 std::chrono::duration<double, std::milli>(now - lastReleased).count()
-                    > UnlockDelayMs)
+                    > UnlockDelayMs && lockReasons.contains(NAMEOF(DeadLocker))
+                && (!resolvingMap.contains(NAMEOF(DeadLocker)) || !resolvingMap.at(NAMEOF(DeadLocker)).load()))
             {
-                Recover("DeadLocker");
+                Recover(NAMEOF(DeadLocker));
+                dbHandler->InsertDataNow(EMERGENCYREMOVELOCKREASON, NAMEOF(DeadLocker), "The Emergency Button was released.");
             }
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(10));

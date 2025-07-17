@@ -2,17 +2,20 @@
 #include "../DeadLocker/DeadLocker.h"
 #include "../AimHandler/AimHandler.h"
 #include "../Logger/Logger.h"
+#include "../DbHandler/DbHandler.h"
 
-std::string NeuralNetworkHandler::names[4] = {"Person", "Cat", "Dog", "Insect"};
+std::string NeuralNetworkHandler::names[3] = {"Person", "Pet", "Insect"};
 
-std::thread       NeuralNetworkHandler::worker_;
-std::atomic<bool> NeuralNetworkHandler::running_{false};
-ncnn::Net         NeuralNetworkHandler::yolo_;
-cv::VideoCapture  NeuralNetworkHandler::cap_;
-std::mutex        NeuralNetworkHandler::frameMutex_;
-cv::Mat           NeuralNetworkHandler::latestFrame_;
+std::thread                                     NeuralNetworkHandler::worker_;
+std::atomic<bool>                               NeuralNetworkHandler::running_{false};
+ncnn::Net                                       NeuralNetworkHandler::yolo_;
+cv::VideoCapture                                NeuralNetworkHandler::cap_;
+std::mutex                                      NeuralNetworkHandler::frameMutex_;
+cv::Mat                                         NeuralNetworkHandler::latestFrame_;
+DbHandler*                                      NeuralNetworkHandler::dbHandler = nullptr;
+const std::chrono::duration                     shootingSustain = std::chrono::nanoseconds(1000*1000*1000);
 
-void NeuralNetworkHandler::Initialize(const char* paramPath, const char* binPath) {
+void NeuralNetworkHandler::Initialize(DbHandler* db , const char* paramPath, const char* binPath) {
     cap_.open("libcamerasrc af-mode=continuous ! video/x-raw,width=1280,height=720,framerate=30/1,format=NV12 ! "
               "videoconvert ! appsink", cv::CAP_GSTREAMER);
     yolo_.opt.num_threads = 4;
@@ -20,28 +23,32 @@ void NeuralNetworkHandler::Initialize(const char* paramPath, const char* binPath
     yolo_.load_model(binPath);
     running_ = true;
     worker_ = std::thread(&NeuralNetworkHandler::ThreadFunc);
+    dbHandler = db;
 }
 
 void NeuralNetworkHandler::Dispose() {
     running_ = false;
     if (worker_.joinable()) worker_.join();
+    cap_.release();
 }
 
 void NeuralNetworkHandler::ThreadFunc() {
     const float mean_vals[3] = {0.f, 0.f, 0.f};
     const float norm_vals[3] = {1 / 255.f, 1 / 255.f, 1 / 255.f};
     const float score_threshold = 0.40f;
-
+    bool needsResolving = false;
     cv::Scalar boxColor(0, 255, 0);
     cv::Scalar textColor(0, 0, 255);
     int fontFace = cv::FONT_HERSHEY_SIMPLEX;
     double fontScale = 0.5;
     int thickness = 1;
+    int clsId = -1;
 
     cv::Mat frame;
 
     while (running_) {
         if (!cap_.read(frame) || frame.empty()) continue;
+        cv::flip(frame, frame, -1);
 
         int ih = frame.rows, iw = frame.cols;
         int len = std::max(ih, iw);
@@ -69,7 +76,6 @@ void NeuralNetworkHandler::ThreadFunc() {
         bool emergency = false;
         bool aim = false;
         float aimX = 0.f, aimY = 0.f;
-        int clsId = -1;
 
         std::vector<std::tuple<cv::Rect, std::string>> drawnBoxes;
 
@@ -96,14 +102,14 @@ void NeuralNetworkHandler::ThreadFunc() {
             float x1 = (cx + w * 0.5f) * scale;
             float y1 = (cy + h * 0.5f) * scale;
 
-            aimX = (x0 + x1) * 0.5f;
-            aimY = (y0 + y1) * 0.5f;
+            aimX = cx / 512.f;
+            aimY = cy / 512.f;
 
-            if (best_cls >= 0 && best_cls < 4) {
+            if (best_cls >= 0 && best_cls < 3) {
                 cv::Rect box = cv::Rect(cv::Point(int(x0), int(y0)), cv::Point(int(x1), int(y1)));
                 drawnBoxes.emplace_back(box, names[best_cls]);
 
-                if (best_cls <= 2) {
+                if (best_cls <= 1) {
                     emergency = true;
                     aim = false;
                     clsId = best_cls;
@@ -111,17 +117,37 @@ void NeuralNetworkHandler::ThreadFunc() {
                 }
 
                 aim = true;
+                clsId = best_cls;
             }
         }
 
+        std::string name = clsId >= 0 && clsId <3? names[clsId] : "UNKNOWN";
+        
         if (emergency) {
-            Logger::Info("Protected entity was detected: {}: X({}) Y({})", names[clsId], aimX, aimY);
-            DeadLocker::EmergencyInitiate(NAMEOF(NeuralNetworkHandler));
-        } else {
-            if (DeadLocker::IsLocked()) {
+            std::string msg = fmt::format("Protected entity was detected: {}: X({}) Y({})", name, aimX, aimY);
+            Logger::Info(msg);
+            if(!DeadLocker::lockReasons.contains(NAMEOF(NeuralNetworkHandler)))
+            {
+                dbHandler->InsertDataNow(EMERGENCYADDLOCKREASON, NAMEOF(NeuralNetworkHandler), msg);
+                DeadLocker::EmergencyInitiate(NAMEOF(NeuralNetworkHandler));
+                needsResolving = true;
+            }
+        } else if(!AimHandler::IsCalibrationEnabled()) {
+            if (DeadLocker::IsLocked() && DeadLocker::lockReasons.contains(NAMEOF(NeuralNetworkHandler)) && needsResolving) {
+                dbHandler->InsertDataNow(EMERGENCYREMOVELOCKREASON, NAMEOF(NeuralNetworkHandler), "All protected entities exited the camera view");
                 DeadLocker::Recover(NAMEOF(NeuralNetworkHandler));
-            } else if (aim) {
-                AimHandler::SetPoint({aimX, aimY});
+                needsResolving = false;
+            } else if (aim && !DeadLocker::IsLocked()) {
+                std::string msg = fmt::format("An {} was detected at X({}) Y({}). Eliminating.", name, aimX, aimY);
+                if(std::chrono::_V2::system_clock::now() - AimHandler::GetLastShoot() > shootingSustain)
+                {
+                    dbHandler->InsertDataNow(ELIMINATION, NAMEOF(NeuralNetworkHandler), msg);
+                }
+                std::string response = AimHandler::ShootAt({aimX, aimY});
+                Logger::Info(response);
+            } else if(std::chrono::_V2::system_clock::now() - AimHandler::GetLastShoot() > shootingSustain && AimHandler::IsLaserEnabled()) {
+                std::string response = AimHandler::Disarm();
+                Logger::Info(response);
             }
         }
 

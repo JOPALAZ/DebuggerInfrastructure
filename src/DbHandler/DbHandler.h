@@ -26,10 +26,21 @@ struct RecordData
     int64_t time;
     int event;
     std::string className;
-    std::string outcome;
+    std::string description;
 
-    RecordData(sqlite_int64 time, int event, const unsigned char* className, const unsigned char* outcome);
-    RecordData(int64_t time, int event, const std::string& className, const std::string& outcome);
+    RecordData(sqlite_int64 time, int event, const unsigned char* className, const unsigned char* description);
+    RecordData(int64_t time, int event, const std::string& className, const std::string& description);
+};
+
+enum Event
+{
+    EMERGENCYLOCK = 0,
+    EMERGENCYADDLOCKREASON = 1,
+    EMERGENCYREMOVELOCKREASON = 2,
+    EMERGENCYUNLOCK = 3,
+    CALIBRATIONSTART = 4,
+    CALIBRATIONEND = 5,
+    ELIMINATION = 6
 };
 
 /**
@@ -59,9 +70,12 @@ public:
      * @param time Unix timestamp
      * @param event Event ID
      * @param className Class name
-     * @param outcome Outcome
+     * @param description Outcome
      */
-    void InsertData(int64_t time, int event, const std::string& className, const std::string& outcome);
+    void InsertData(int64_t time, int event, const std::string& className, const std::string& description);
+    void InsertData(int64_t time, Event event, const std::string& className, const std::string& description);
+    void InsertDataNow(int event, const std::string& className, const std::string& description);
+    void InsertDataNow(Event event, const std::string& className, const std::string& description);
 
     /**
      * @brief Adds a record to internal buffer; flushes to DB if conditions met.

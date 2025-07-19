@@ -16,7 +16,7 @@ DbHandler*                                      NeuralNetworkHandler::dbHandler 
 const std::chrono::duration                     shootingSustain = std::chrono::nanoseconds(1000*1000*1000);
 
 void NeuralNetworkHandler::Initialize(DbHandler* db , const char* paramPath, const char* binPath) {
-    cap_.open("libcamerasrc af-mode=continuous ! video/x-raw,width=1280,height=720,framerate=30/1,format=NV12 ! "
+    cap_.open("libcamerasrc af-mode=continuous ! video/x-raw,width=1024,height=1024,framerate=30/1,format=NV12 ! "
               "videoconvert ! appsink", cv::CAP_GSTREAMER);
     yolo_.opt.num_threads = 4;
     yolo_.load_param(paramPath);

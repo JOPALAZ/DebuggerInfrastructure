@@ -91,8 +91,8 @@ void ExternalConfigsHelper::setDefaultCalibrationSettings(std::string path)
 }
 
 CalibrationSettings ExternalConfigsHelper::defaultCalibrationSettings = CalibrationSettings{
-    {34.0, 52.0},
-    {31.0, 52.5},
-    {44.0, 42.0}
+    {31.0, 52.0},
+    {31.0, 53.0},
+    {42.0, 42.0}
 };
 std::unordered_map<std::string, CalibrationSettings> ExternalConfigsHelper::settingsMap;

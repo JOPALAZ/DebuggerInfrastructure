@@ -415,21 +415,37 @@ void RESTApi::RegisterEndpoints()
 
     svr_.Get("/video", [&](const httplib::Request& req, httplib::Response& res) {
         res.set_header("Connection", "close");
-        res.set_content_provider(
-            "multipart/x-mixed-replace; boundary=frame",
-            [&](size_t /*offset*/, httplib::DataSink& sink) {
-                auto frame = NeuralNetworkHandler::GetLatestFrame();
-                std::vector<uchar> buf;
-                cv::imencode(".jpg", frame, buf);
-                std::ostringstream header;
-                header << "--frame\r\n"
-                    << "Content-Type: image/jpeg\r\n"
-                    << "Content-Length: " << buf.size() << "\r\n\r\n";
-                sink.write(header.str().data(), header.str().size());
-                sink.write(reinterpret_cast<char*>(buf.data()), buf.size());
-                sink.write("\r\n", 2);
-                return true;
-            }
-        );
+        try {
+            res.set_content_provider(
+                "multipart/x-mixed-replace; boundary=frame",
+                [&](size_t /*offset*/, httplib::DataSink& sink) {
+                    try {
+                        auto frame = NeuralNetworkHandler::GetLatestFrame();
+                        std::vector<uchar> buf;
+                        cv::imencode(".jpg", frame, buf);
+                        std::ostringstream header;
+                        header << "--frame\r\n"
+                            << "Content-Type: image/jpeg\r\n"
+                            << "Content-Length: " << buf.size() << "\r\n\r\n";
+                        sink.write(header.str().data(), header.str().size());
+                        sink.write(reinterpret_cast<char*>(buf.data()), buf.size());
+                        sink.write("\r\n", 2);
+                        return true;
+                    } catch (...) {
+                        sink.write(
+                            "HTTP/1.1 500 Internal Server Error\r\n"
+                            "Content-Type: text/plain\r\n"
+                            "Connection: close\r\n"
+                            "\r\n"
+                            "Internal Server Error", 93
+                        );
+                        return false;
+                    }
+                }
+            );
+        } catch (...) {
+            res.status = 500;
+            res.set_content("Internal Server Error", "text/plain");
+        }
     });
 }

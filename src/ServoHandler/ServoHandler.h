@@ -10,7 +10,7 @@
 #include <string>
 
 static constexpr double kMinPulseWidthUs = 500.0;
-static constexpr double kMaxPulseWidthUs = 2425.0;
+static constexpr double kMaxPulseWidthUs = 2400.0;
 static constexpr double kMinAngle = 0.0;
 static constexpr double kMaxAngle = 180.0;
 

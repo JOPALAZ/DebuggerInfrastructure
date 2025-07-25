@@ -16,7 +16,7 @@
  * @brief A simple Logger class that writes messages to both a file and console (based on severities).
  */
 namespace DebuggerInfrastructure
-    {
+{
     class Logger
     {
     private:

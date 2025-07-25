@@ -3,13 +3,12 @@
 #include <string>
 #include <atomic>
 
-
+// Forward declarations to avoid pulling in <gpiod.h> here
+struct gpiod_chip;
+struct gpiod_line;
 
 namespace DebuggerInfrastructure
 {
-    // Forward declarations to avoid pulling in <gpiod.h> here
-    struct gpiod_chip;
-    struct gpiod_line;
     /**
      * @brief A static helper class that provides basic GPIO handling via libgpiod.
      *

@@ -3,11 +3,11 @@
 #include <mutex>
 #include "../Logger/Logger.h"
 #include "../ExternalConfigsHelper/ExternalConfigsHelper.h"
-
+class gpiod_line;
 namespace DebuggerInfrastructure
 {
     class ServoHandler;
-    class gpiod_line;
+
 
     struct CalibrationSettings
     {

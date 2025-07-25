@@ -13,6 +13,8 @@
 #include "../DeadLocker/DeadLocker.h"
 #include "../NeuralNetworkHandler/NeuralNetworkHandler.h"
 
+using namespace DebuggerInfrastructure;
+
 bool running = true;
 void signalHandler(int signal) {
     std::cerr << "Signal " << signal << " received, disposing resources..." << std::endl;

@@ -50,21 +50,26 @@ namespace DebuggerInfrastructure
     class DbHandler
     {
     public:
+        DbHandler() = delete;
+        DbHandler(const DbHandler&) = delete;
+        DbHandler(DbHandler&&) = delete;
+        DbHandler& operator=(const DbHandler&) = delete;
+        DbHandler& operator=(DbHandler&&) = delete;
         /**
-         * @brief Default constructor. Opens database at "..\\db.sqlite3" and ensures table existence.
+         * @brief Default Init. Opens database at "..\\db.sqlite3" and ensures table existence.
          */
-        DbHandler();
+        static void Initialize();
 
         /**
-         * @brief Constructs DbHandler with custom database path.
+         * @brief Init DbHandler with custom database path.
          * @param dbpath Path to SQLite database file
          */
-        DbHandler(std::filesystem::path dbpath);
+        static void Initialize(std::filesystem::path dbpath);
 
         /**
          * @brief Destructor flushes any remaining buffered data and closes the database.
          */
-        ~DbHandler();
+        static void Dispose();
 
         /**
          * @brief Adds a record to internal buffer; flushes to DB if conditions met.
@@ -73,22 +78,22 @@ namespace DebuggerInfrastructure
          * @param className Class name
          * @param description Outcome
          */
-        void InsertData(int64_t time, int event, const std::string& className, const std::string& description);
-        void InsertData(int64_t time, Event event, const std::string& className, const std::string& description);
-        void InsertDataNow(int event, const std::string& className, const std::string& description);
-        void InsertDataNow(Event event, const std::string& className, const std::string& description);
+        static void InsertData(int64_t time, int event, const std::string& className, const std::string& description);
+        static void InsertData(int64_t time, Event event, const std::string& className, const std::string& description);
+        static void InsertDataNow(int event, const std::string& className, const std::string& description);
+        static void InsertDataNow(Event event, const std::string& className, const std::string& description);
 
         /**
          * @brief Adds a record to internal buffer; flushes to DB if conditions met.
          * @param record The record data
          */
-        void InsertData(RecordData record);
+        static void InsertData(RecordData record);
 
         /**
          * @brief Reads all events from the database
          * @return Vector of RecordData
          */
-        std::vector<RecordData> ReadData();
+        static std::vector<RecordData> ReadData();
 
         /**
          * @brief Reads events from the database with TIME between start and end (inclusive).
@@ -96,61 +101,65 @@ namespace DebuggerInfrastructure
          * @param end End timestamp
          * @return Vector of RecordData
          */
-        std::vector<RecordData> ReadDataByRange(int64_t start, int64_t end);
+        static std::vector<RecordData> ReadDataByRange(int64_t start, int64_t end);
 
         /**
          * @brief Reads events from the database with TIME > time.
          * @param time The cutoff timestamp
          * @return Vector of RecordData
          */
-        std::vector<RecordData> ReadDataAfter(int64_t time);
+        static std::vector<RecordData> ReadDataAfter(int64_t time);
 
         /**
          * @brief Reads events from the database with TIME < time.
          * @param time The cutoff timestamp
          * @return Vector of RecordData
          */
-        std::vector<RecordData> ReadDataBefore(int64_t time);
+        static std::vector<RecordData> ReadDataBefore(int64_t time);
 
     private:
         /**
          * @brief Opens the database connection and initializes 'db'.
          * @throws std::ios_base::failure if opening fails
          */
-        void OpenDb();
+        static void OpenDb();
 
         /**
          * @brief Creates the table (if it doesn't exist) for storing events.
          * @throws std::runtime_error if creation fails
          */
-        void CreateTableIfNeeded();
+        static void CreateTableIfNeeded();
 
         /**
          * @brief Flushes the buffer to the database if conditions are met (size/time).
          */
-        void MaybeFlush();
+        static void MaybeFlush();
 
         /**
          * @brief Flushes all events currently in the buffer into the database.
          * @throws std::runtime_error if insertion fails
          */
-        void FlushBuffer();
+        static void FlushBuffer();
+
+        static void CheckInitialized();
 
     private:
-        sqlite3* db = nullptr;
-        std::filesystem::path dbpath;
+        static sqlite3* db;
+        static std::filesystem::path dbpath;
 
         // Buffer for records
-        std::vector<RecordData> buffer_;
+        static std::vector<RecordData> buffer_;
 
         // Maximum number of records to accumulate before forcing a flush
-        size_t maxBufferSize_ = 0xff;
+        static constexpr size_t maxBufferSize_ = 0xff;
 
         // Interval after which we also force a flush
-        std::chrono::steady_clock::time_point lastFlushTime_ = std::chrono::steady_clock::now();
-        std::chrono::seconds flushInterval_ = std::chrono::seconds(30);
+        static std::chrono::steady_clock::time_point lastFlushTime;
+        static constexpr std::chrono::seconds flushInterval_ = std::chrono::seconds(30);
 
         // Mutex for thread safety (in case multiple threads use DbHandler)
-        std::mutex mutex_;
+        static std::mutex mutex_;
+
+        static bool initialized;
     };
 }

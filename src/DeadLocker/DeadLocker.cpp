@@ -15,14 +15,12 @@ namespace DebuggerInfrastructure
     std::unordered_map<std::string, std::thread>        DeadLocker::unlockThrdPool;
     std::unordered_map<std::string, std::atomic<std::chrono::_V2::system_clock::time_point>>  DeadLocker::cancelUnlockMap;
     std::unordered_map<std::string, std::atomic<bool>>  DeadLocker::resolvingMap;
-    DbHandler*                                          DeadLocker::dbHandler = nullptr;
 
-    void DeadLocker::Initialize(DbHandler* db, int lineOffset) {
+    void DeadLocker::Initialize(int lineOffset) {
         ButtonLine    = GPIOHandler::GetLine(lineOffset);
         GPIOHandler::RequestLineInput(ButtonLine, "EmergencyButtonGPIO");
         cycle.store(true);
         thrd = std::thread(threadFunc);
-        dbHandler = db;
     }
 
     void DeadLocker::Dispose() {
@@ -48,7 +46,7 @@ namespace DebuggerInfrastructure
             AimHandler::EmergencyDisableAndLock();
             if(caller != NAMEOF(main))
             {
-                dbHandler->InsertDataNow(EMERGENCYLOCK, NAMEOF(DeadLocker), "System was locked because of an emergency.");
+                DbHandler::InsertDataNow(EMERGENCYLOCK, NAMEOF(DeadLocker), "System was locked because of an emergency.");
             }
         }
         cancelUnlockMap[caller].store(std::chrono::system_clock::now());
@@ -75,7 +73,7 @@ namespace DebuggerInfrastructure
                     if(DeadLocker::lockReasons.empty())
                     {
                         DeadLocker::unlockNow();
-                        dbHandler->InsertDataNow(EMERGENCYUNLOCK, NAMEOF(DeadLocker), "All emergencies were cleared. System recovered.");
+                        DbHandler::InsertDataNow(EMERGENCYUNLOCK, NAMEOF(DeadLocker), "All emergencies were cleared. System recovered.");
                     }
                 }
                 DeadLocker::resolvingMap[caller].store(false);
@@ -99,7 +97,7 @@ namespace DebuggerInfrastructure
         while (cycle.load()) {
             if (!gpiod_line_get_value(ButtonLine) && !lockReasons.contains(NAMEOF(DeadLocker))) {
                 EmergencyInitiate(NAMEOF(DeadLocker));
-                dbHandler->InsertDataNow(EMERGENCYADDLOCKREASON, NAMEOF(DeadLocker), "The Emergency Button was pressed.");
+                DbHandler::InsertDataNow(EMERGENCYADDLOCKREASON, NAMEOF(DeadLocker), "The Emergency Button was pressed.");
                 GPIOHandler::WaitForValue(ButtonLine, true, cycle);
                 lastReleased = std::chrono::system_clock::now();
             } else {
@@ -110,7 +108,7 @@ namespace DebuggerInfrastructure
                     && (!resolvingMap.contains(NAMEOF(DeadLocker)) || !resolvingMap.at(NAMEOF(DeadLocker)).load()))
                 {
                     Recover(NAMEOF(DeadLocker));
-                    dbHandler->InsertDataNow(EMERGENCYREMOVELOCKREASON, NAMEOF(DeadLocker), "The Emergency Button was released.");
+                    DbHandler::InsertDataNow(EMERGENCYREMOVELOCKREASON, NAMEOF(DeadLocker), "The Emergency Button was released.");
                 }
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(10));

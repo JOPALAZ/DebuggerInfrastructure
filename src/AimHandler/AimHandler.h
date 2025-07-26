@@ -21,7 +21,7 @@ namespace DebuggerInfrastructure
 
     class AimHandler {
     public:
-        static void Initialize(DbHandler* db, int pwmChip = 0, int xChannel = 0, int yChannel = 1, std::string calibrationPath = "config.json");
+        static void Initialize(int pwmChip = 0, int xChannel = 0, int yChannel = 1, std::string calibrationPath = "config.json");
         static bool SetXAngle(double angle);
         static bool SetYAngle(double angle);
         static std::string SetAnglePoint(std::pair<double,double> anglePoint);
@@ -48,7 +48,6 @@ namespace DebuggerInfrastructure
         static bool m_initialized;
         static bool locked;
         static bool calibrationActive;
-        static DbHandler* dbHandler;
         static std::chrono::_V2::system_clock::time_point  lastShoot;      
     };
 }

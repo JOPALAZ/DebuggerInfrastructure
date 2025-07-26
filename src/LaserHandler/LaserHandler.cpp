@@ -14,11 +14,10 @@ namespace DebuggerInfrastructure
     gpiod_line* LaserHandler::line = nullptr;
     bool LaserHandler::initialized = false;
 
-    void LaserHandler::Initialize(gpiod_line* line)
+    void LaserHandler::Initialize(size_t lineId)
     {
         // Protect shared data/state
         std::lock_guard<std::mutex> guard(mtx);
-
         if (initialized)
         {
             Logger::Info("LaserHandler is already initialized.");
@@ -32,8 +31,8 @@ namespace DebuggerInfrastructure
             }
             return;
         }
-
-        LaserHandler::line = line;
+        line = GPIOHandler::GetLine(lineId);
+        GPIOHandler::RequestLineOutput(line, "LaserGPIOpin");
 
         // Unlock and disable the laser initially
         LaserHandler::lock = false;

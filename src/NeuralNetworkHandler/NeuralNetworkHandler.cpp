@@ -13,10 +13,9 @@ namespace DebuggerInfrastructure
     cv::VideoCapture                                NeuralNetworkHandler::cap_;
     std::mutex                                      NeuralNetworkHandler::frameMutex_;
     cv::Mat                                         NeuralNetworkHandler::latestFrame_;
-    DbHandler*                                      NeuralNetworkHandler::dbHandler = nullptr;
     const std::chrono::duration                     shootingSustain = std::chrono::nanoseconds(1000*1000*1000);
 
-    void NeuralNetworkHandler::Initialize(DbHandler* db , const char* paramPath, const char* binPath) {
+    void NeuralNetworkHandler::Initialize(const char* paramPath, const char* binPath) {
         cap_.open("libcamerasrc af-mode=continuous ! video/x-raw,width=1024,height=1024,framerate=30/1,format=NV12 ! "
                 "videoconvert ! appsink", cv::CAP_GSTREAMER);
         yolo_.opt.num_threads = 4;
@@ -24,7 +23,6 @@ namespace DebuggerInfrastructure
         yolo_.load_model(binPath);
         running_ = true;
         worker_ = std::thread(&NeuralNetworkHandler::ThreadFunc);
-        dbHandler = db;
     }
 
     void NeuralNetworkHandler::Dispose() {
@@ -129,20 +127,20 @@ namespace DebuggerInfrastructure
                 Logger::Info(msg);
                 if(!DeadLocker::lockReasons.contains(NAMEOF(NeuralNetworkHandler)))
                 {
-                    dbHandler->InsertDataNow(EMERGENCYADDLOCKREASON, NAMEOF(NeuralNetworkHandler), msg);
+                    DbHandler::InsertDataNow(EMERGENCYADDLOCKREASON, NAMEOF(NeuralNetworkHandler), msg);
                     DeadLocker::EmergencyInitiate(NAMEOF(NeuralNetworkHandler));
                     needsResolving = true;
                 }
             } else if(!AimHandler::IsCalibrationEnabled()) {
                 if (DeadLocker::IsLocked() && DeadLocker::lockReasons.contains(NAMEOF(NeuralNetworkHandler)) && needsResolving) {
-                    dbHandler->InsertDataNow(EMERGENCYREMOVELOCKREASON, NAMEOF(NeuralNetworkHandler), "All protected entities exited the camera view");
+                    DbHandler::InsertDataNow(EMERGENCYREMOVELOCKREASON, NAMEOF(NeuralNetworkHandler), "All protected entities exited the camera view");
                     DeadLocker::Recover(NAMEOF(NeuralNetworkHandler));
                     needsResolving = false;
                 } else if (aim && !DeadLocker::IsLocked()) {
                     std::string msg = fmt::format("An {} was detected at X({}) Y({}). Eliminating.", name, aimX, aimY);
                     if(std::chrono::_V2::system_clock::now() - AimHandler::GetLastShoot() > shootingSustain)
                     {
-                        dbHandler->InsertDataNow(ELIMINATION, NAMEOF(NeuralNetworkHandler), msg);
+                        DbHandler::InsertDataNow(ELIMINATION, NAMEOF(NeuralNetworkHandler), msg);
                     }
                     std::string response = AimHandler::ShootAt({aimX, aimY});
                     Logger::Info(response);

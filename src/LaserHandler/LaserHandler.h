@@ -47,7 +47,7 @@ namespace DebuggerInfrastructure
          * @param GPIOpin The pin number on the GPIO chip to be used for laser control.
          * @throw std::runtime_error If the chip or line fails to open, or if line request fails.
          */
-        static void Initialize(gpiod_line* line);
+        static void Initialize(size_t lineId);
 
         /**
          * @brief Disables the laser immediately and locks it (cannot be enabled until unlocked).

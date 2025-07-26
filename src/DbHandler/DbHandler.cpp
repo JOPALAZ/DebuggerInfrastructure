@@ -38,25 +38,41 @@ namespace DebuggerInfrastructure
     {
     }
 
+    sqlite3* DbHandler::db = nullptr;
+    std::filesystem::path DbHandler::dbpath;
+
+    // Buffer for records
+    std::vector<RecordData> DbHandler::buffer_;
+
+    // Interval after which we also force a flush
+    std::chrono::steady_clock::time_point DbHandler::lastFlushTime;
+
+    // Mutex for thread safety (in case multiple threads use DbHandler)
+    std::mutex DbHandler::mutex_;
+
+    bool DbHandler::initialized;
+
     //----------------------------------------------
-    // DbHandler constructors/destructor
+    // DbHandler Initialize/Dispose
     //----------------------------------------------
-    DbHandler::DbHandler()
+    void DbHandler::Initialize()
     {
         dbpath = "db.sqlite3";
-        this->OpenDb();
-        this->CreateTableIfNeeded();
+        Initialize(dbpath);
     }
 
-    DbHandler::DbHandler(std::filesystem::path dbpath)
-        : dbpath(dbpath)
+    void DbHandler::Initialize(std::filesystem::path dbpath)
     {
-        this->OpenDb();
-        this->CreateTableIfNeeded();
+        DbHandler::dbpath = dbpath;
+        lastFlushTime = std::chrono::steady_clock::now();
+        OpenDb();
+        CreateTableIfNeeded();
+        initialized = true;
     }
 
-    DbHandler::~DbHandler()
+    void DbHandler::Dispose()
     {
+        if(!initialized) return;
         // Flush any remaining data in the buffer before closing
         {
             std::lock_guard<std::mutex> lock(mutex_);
@@ -68,8 +84,15 @@ namespace DebuggerInfrastructure
             sqlite3_close(db);
             db = nullptr;
         }
-
+        initialized = false;
         Logger::Verbose("DbHandler destroyed, all buffered data flushed and DB closed.");
+    }
+
+    void DbHandler::CheckInitialized()
+    {
+        if (!initialized) {
+            throw std::runtime_error("DbHandler is not initialized");
+        }
     }
 
     //----------------------------------------------
@@ -77,6 +100,7 @@ namespace DebuggerInfrastructure
     //----------------------------------------------
     void DbHandler::InsertData(int64_t time, int event, const std::string& className, const std::string& description)
     {
+        CheckInitialized();
         // Lock to protect shared resources
         std::lock_guard<std::mutex> lock(mutex_);
 
@@ -113,6 +137,7 @@ namespace DebuggerInfrastructure
     //----------------------------------------------
     std::vector<RecordData> DbHandler::ReadData()
     {
+        CheckInitialized();
         std::vector<RecordData> output;
         const char* sql = "SELECT * FROM Events ORDER BY TIME DESC;";
         sqlite3_stmt* stmt;
@@ -139,6 +164,7 @@ namespace DebuggerInfrastructure
 
     std::vector<RecordData> DbHandler::ReadDataByRange(int64_t start, int64_t end)
     {
+        CheckInitialized();
         const char* sql = "SELECT * FROM Events WHERE TIME BETWEEN ? AND ? ORDER BY TIME DESC;";
         sqlite3_stmt* stmt;
         std::vector<RecordData> output;
@@ -166,6 +192,7 @@ namespace DebuggerInfrastructure
 
     std::vector<RecordData> DbHandler::ReadDataAfter(int64_t time)
     {
+        CheckInitialized();
         const char* sql = "SELECT * FROM Events WHERE TIME > ? ORDER BY TIME DESC;";
         sqlite3_stmt* stmt;
         std::vector<RecordData> output;
@@ -192,6 +219,7 @@ namespace DebuggerInfrastructure
 
     std::vector<RecordData> DbHandler::ReadDataBefore(int64_t time)
     {
+        CheckInitialized();
         std::vector<RecordData> output;
         const char* sql = "SELECT * FROM Events WHERE TIME < ? ORDER BY TIME DESC;";
         sqlite3_stmt* stmt;
@@ -261,18 +289,20 @@ namespace DebuggerInfrastructure
     //----------------------------------------------
     void DbHandler::MaybeFlush()
     {
+        CheckInitialized();
         // We check size limit or time limit
         auto now = std::chrono::steady_clock::now();
         if (buffer_.size() >= maxBufferSize_ ||
-            (now - lastFlushTime_) >= flushInterval_)
+            (now - lastFlushTime) >= flushInterval_)
         {
             FlushBuffer();
-            lastFlushTime_ = std::chrono::steady_clock::now();
+            lastFlushTime = std::chrono::steady_clock::now();
         }
     }
 
     void DbHandler::FlushBuffer()
     {
+        CheckInitialized();
         if (buffer_.empty()) {
             return; // Nothing to flush
         }

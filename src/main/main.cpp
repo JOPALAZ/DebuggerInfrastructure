@@ -13,73 +13,76 @@
 #include "../DeadLocker/DeadLocker.h"
 #include "../NeuralNetworkHandler/NeuralNetworkHandler.h"
 
-using namespace DebuggerInfrastructure;
-
-bool running = true;
-void signalHandler(int signal) {
-    std::cerr << "Signal " << signal << " received, disposing resources..." << std::endl;
-    try
-    {
-        DeadLocker::EmergencyInitiate(NAMEOF(main));
-        NeuralNetworkHandler::Dispose();
-        LaserHandler::Dispose();
-        AimHandler::Dispose();
-        DeadLocker::Dispose();
-        GPIOHandler::Dispose();
-    }
-    catch(std::exception& ex)
-    {
-        std::cerr << "Irrecoverable exception during signal [" << signal << "] hanlding. EX: " << ex.what();
-        exit(signal);
-    }
-    catch(...)
-    {
-        std::cerr << "Irrecoverable unknown exception during signal [" << signal << "] hanlding.";
-        exit(signal);
-    }
-    running = false;
-}
-
-void setupSignalHandlers() {
-    std::signal(SIGINT, signalHandler);
-    std::signal(SIGTERM, signalHandler);
-    std::signal(SIGHUP, signalHandler);
-}
-
-int main()
+namespace DebuggerInfrastructure
 {
-    try {
-        setupSignalHandlers();
-        DbHandler* DbHandlerPtr = new DbHandler();
-        Logger::Initialize("", 1, 0);
-        GPIOHandler::Initialize("gpiochip0");
-        gpiod_line* LaserLine = GPIOHandler::GetLine(16);
-        GPIOHandler::RequestLineOutput(LaserLine, "LaserGPIOpin");
-        LaserHandler::Initialize(LaserLine);
-        AimHandler::Initialize(DbHandlerPtr);
-        DeadLocker::Initialize(DbHandlerPtr, 22);
-        NeuralNetworkHandler::Initialize(DbHandlerPtr, "./res/Model/model.ncnn.param", "./res/Model/model.ncnn.bin");
-        RESTApi rest(DbHandlerPtr,"0.0.0.0",8081);
-        FrontEnd front("./res/FrontEnd/index.html","0.0.0.0",8080);
-        rest.Start();
-        front.Start();
-        while(running)
+
+    bool running = true;
+    void signalHandler(int signal) {
+        std::cerr << "Signal " << signal << " received, disposing resources..." << std::endl;
+        try
         {
-            std::this_thread::sleep_for(std::chrono::seconds(1));
+            DeadLocker::EmergencyInitiate(NAMEOF(main));
+            NeuralNetworkHandler::Dispose();
+            LaserHandler::Dispose();
+            AimHandler::Dispose();
+            DeadLocker::Dispose();
+            GPIOHandler::Dispose();
         }
-        rest.Stop();
-        front.Stop();
-        if(DbHandlerPtr)
+        catch(std::exception& ex)
         {
-            delete DbHandlerPtr;
-            DbHandlerPtr = nullptr;
+            std::cerr << "Irrecoverable exception during signal [" << signal << "] hanlding. EX: " << ex.what();
+            exit(signal);
         }
-        return 0;
-    } catch (const std::exception& ex) {
-        std::cerr << "Fatal exception: " << ex.what() << std::endl;
-        return 1;
-    } catch (...) {
-        std::cerr << "Unknown fatal exception." << std::endl;
-        return 2;
+        catch(...)
+        {
+            std::cerr << "Irrecoverable unknown exception during signal [" << signal << "] hanlding.";
+            exit(signal);
+        }
+        running = false;
     }
+
+    void setupSignalHandlers() {
+        std::signal(SIGINT, signalHandler);
+        std::signal(SIGTERM, signalHandler);
+        std::signal(SIGHUP, signalHandler);
+    }
+
+    int main()
+    {
+        try {
+            setupSignalHandlers();
+            DbHandler* DbHandlerPtr = new DbHandler();
+            Logger::Initialize("", 1, 0);
+            GPIOHandler::Initialize("gpiochip0");
+            gpiod_line* LaserLine = GPIOHandler::GetLine(16);
+            GPIOHandler::RequestLineOutput(LaserLine, "LaserGPIOpin");
+            LaserHandler::Initialize(LaserLine);
+            AimHandler::Initialize(DbHandlerPtr);
+            DeadLocker::Initialize(DbHandlerPtr, 22);
+            NeuralNetworkHandler::Initialize(DbHandlerPtr, "./res/Model/model.ncnn.param", "./res/Model/model.ncnn.bin");
+            RESTApi rest(DbHandlerPtr,"0.0.0.0",8081);
+            FrontEnd front("./res/FrontEnd/index.html","0.0.0.0",8080);
+            rest.Start();
+            front.Start();
+            while(running)
+            {
+                std::this_thread::sleep_for(std::chrono::seconds(1));
+            }
+            rest.Stop();
+            front.Stop();
+            if(DbHandlerPtr)
+            {
+                delete DbHandlerPtr;
+                DbHandlerPtr = nullptr;
+            }
+            return 0;
+        } catch (const std::exception& ex) {
+            std::cerr << "Fatal exception: " << ex.what() << std::endl;
+            return 1;
+        } catch (...) {
+            std::cerr << "Unknown fatal exception." << std::endl;
+            return 2;
+        }
+    }
+        
 }

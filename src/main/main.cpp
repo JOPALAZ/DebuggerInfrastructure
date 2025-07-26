@@ -69,7 +69,11 @@ namespace DebuggerInfrastructure
         {
             std::cerr << "Irrecoverable unknown exception during signal [" << signal << "] hanlding.";
         }
-        running = false;
+        {
+            std::lock_guard<std::mutex> lock(mtx);
+            running = false;
+        }
+        conditionalVar.notify_one();
     }
 
     void InitializeCore()

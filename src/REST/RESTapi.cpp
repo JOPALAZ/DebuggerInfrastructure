@@ -197,9 +197,9 @@ namespace DebuggerInfrastructure
             std::string msg;
             json jResponse;
 
-            auto parseParam = [&](const std::string& paramName) -> std::optional<int64_t> {
+            auto parseParam = [&](const std::string& paramName) -> std::optional<double> {
                 try {
-                    return std::stoll(req.get_param_value(paramName));
+                    return std::stod(req.get_param_value(paramName));
                 } catch (...) {
                     return {};
                 }

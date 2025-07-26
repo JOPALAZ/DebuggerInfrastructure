@@ -117,18 +117,10 @@ namespace DebuggerInfrastructure
         return webUi;
     }
 
-    void DisposeWeb(WebUI webUi)
+    void inline DisposeWeb(WebUI webUi)
     {
-        if(webUi.front.get() != nullptr)
-        {
-            webUi.front.get()->Stop();
-            webUi.front.reset();
-        }
-        if(webUi.rest.get() != nullptr)
-        {
-            webUi.rest.get()->Stop();
-            webUi.rest.reset();
-        }
+        webUi.front.reset();
+        webUi.rest.reset();
     }
 }
 

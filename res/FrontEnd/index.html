@@ -537,8 +537,8 @@
     async function setServoAngles() {
       const angleXInput = document.getElementById('angleX');
       const angleYInput = document.getElementById('angleY');
-      const angleX = parseInt(angleXInput.value);
-      const angleY = parseInt(angleYInput.value);
+      const angleX = parseFloat(angleXInput.value);
+      const angleY = parseFloat(angleYInput.value);
 
       if (isNaN(angleX) || isNaN(angleY) || angleX < 0 || angleX > 180 || angleY < 0 || angleY > 180) {
         showMessage("Invalid angle values! Please enter a number between 0 and 180.", "error");

@@ -12,7 +12,6 @@
 namespace DebuggerInfrastructure
     {
     // A static pointer to a single DbHandler instance.
-    static DbHandler* dbHandler = nullptr;
     int RESTApi::port_ = -1;
     // We'll use this for convenience:
     using nlohmann::json;
@@ -26,21 +25,6 @@ namespace DebuggerInfrastructure
         {
             port_ = port;
         }
-        // Initialize or acquire DbHandler instance here
-        static DbHandler dbInstance; 
-        dbHandler = &dbInstance; 
-    }
-
-    RESTApi::RESTApi(DbHandler* db, const std::string& listenAddress, int port)
-        : listenAddress_(listenAddress)
-        , serverThread_()
-        , stopRequested_(false)
-    {
-        if(port_ == -1)
-        {
-            port_ = port;
-        }
-        dbHandler = db;
     }
 
     RESTApi::~RESTApi()
@@ -142,7 +126,7 @@ namespace DebuggerInfrastructure
             std::vector<RecordData> records;
             if (!hasStart && !hasEnd) {
                 Logger::Verbose("GET /data => ReadData()");
-                records = dbHandler->ReadData();
+                records = DbHandler::ReadData();
             } else if (hasStart && hasEnd) {
                 auto maybeStart = parseParam("start");
                 auto maybeEnd   = parseParam("end");
@@ -153,7 +137,7 @@ namespace DebuggerInfrastructure
                     return;
                 }
                 Logger::Verbose("GET /data: range => ReadDataByRange({}, {})", *maybeStart, *maybeEnd);
-                records = dbHandler->ReadDataByRange(*maybeStart, *maybeEnd);
+                records = DbHandler::ReadDataByRange(*maybeStart, *maybeEnd);
             } else if (hasStart) {
                 auto maybeStart = parseParam("start");
                 if (!maybeStart) {
@@ -163,7 +147,7 @@ namespace DebuggerInfrastructure
                     return;
                 }
                 Logger::Verbose("GET /data: after => ReadDataAfter({})", *maybeStart);
-                records = dbHandler->ReadDataAfter(*maybeStart);
+                records = DbHandler::ReadDataAfter(*maybeStart);
             } else {
                 auto maybeEnd = parseParam("end");
                 if (!maybeEnd) {
@@ -173,7 +157,7 @@ namespace DebuggerInfrastructure
                     return;
                 }
                 Logger::Verbose("GET /data: before => ReadDataBefore({})", *maybeEnd);
-                records = dbHandler->ReadDataBefore(*maybeEnd);
+                records = DbHandler::ReadDataBefore(*maybeEnd);
             }
 
             json jResponse = json::array();
@@ -325,7 +309,7 @@ namespace DebuggerInfrastructure
             try {
                 if (DeadLocker::lockReasons.find(NAMEOF(RESTApi)) != DeadLocker::lockReasons.end()) {
                     DeadLocker::Recover(NAMEOF(RESTApi));
-                    dbHandler->InsertDataNow(EMERGENCYREMOVELOCKREASON, NAMEOF(RESTApi), "RESTapi veto was revoked.");
+                    DbHandler::InsertDataNow(EMERGENCYREMOVELOCKREASON, NAMEOF(RESTApi), "RESTapi veto was revoked.");
                     msg = "Successfully unLocked.";
                 } else {
                     msg = "Already unlocked by REST";
@@ -351,7 +335,7 @@ namespace DebuggerInfrastructure
             try {
                 if (DeadLocker::lockReasons.find(NAMEOF(RESTApi)) == DeadLocker::lockReasons.end()) {
                     msg = "Successfully Locked.";
-                    dbHandler->InsertDataNow(EMERGENCYADDLOCKREASON, NAMEOF(RESTApi), "RESTapi veto was invoked.");
+                    DbHandler::InsertDataNow(EMERGENCYADDLOCKREASON, NAMEOF(RESTApi), "RESTapi veto was invoked.");
                 } else {
                     msg = "Already locked by REST";
                 }
@@ -398,7 +382,7 @@ namespace DebuggerInfrastructure
                     auto    className   = item["className"].get<std::string>();
                     auto    description = item["description"].get<std::string>();
                     RecordData rd(time, eventId, className, description);
-                    dbHandler->InsertData(rd);
+                    DbHandler::InsertData(rd);
                     insertedCount++;
                 }
                 json jResponse;

@@ -27,14 +27,6 @@ namespace DebuggerInfrastructure
         RESTApi(const std::string& listenAddress = "0.0.0.0", int port = 8080);
 
         /**
-            * @brief Constructor. Does NOT start the server automatically.
-            * @param db The pointer to the DbHandler instance.
-            * @param listenAddress IP address or hostname (e.g., "0.0.0.0") to listen on.
-            * @param port The port to bind to, e.g., 8080.
-            */
-        RESTApi(DbHandler* db, const std::string& listenAddress = "0.0.0.0", int port = 8080);
-
-        /**
             * @brief Destructor. Stops the server if running.
             */
         ~RESTApi();

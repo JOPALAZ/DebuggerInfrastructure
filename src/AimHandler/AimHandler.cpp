@@ -17,9 +17,8 @@ namespace DebuggerInfrastructure
     bool AimHandler::calibrationActive = false;
     CalibrationSettings AimHandler::calbration;
     std::chrono::_V2::system_clock::time_point AimHandler::lastShoot;
-    DbHandler* AimHandler::dbHandler = nullptr;
 
-    void AimHandler::Initialize(DbHandler* db, int pwmChip, int xChannel, int yChannel, std::string calibrationPath)
+    void AimHandler::Initialize(int pwmChip, int xChannel, int yChannel, std::string calibrationPath)
     {
         std::lock_guard<std::mutex> guard(mtx);
 
@@ -31,7 +30,6 @@ namespace DebuggerInfrastructure
         XServoPtr = new ServoHandler(pwmChip, xChannel, 50.0);
         YServoPtr = new ServoHandler(pwmChip, yChannel, 50.0);
         m_initialized = true;
-        dbHandler = db;
     }
 
     std::chrono::_V2::system_clock::time_point AimHandler::GetLastShoot()
@@ -105,7 +103,7 @@ namespace DebuggerInfrastructure
             response += LaserHandler::Enable() + "\t";
         }
         calibrationActive = true;
-        dbHandler->InsertDataNow(CALIBRATIONSTART, NAMEOF(RESTApi), "System entered the calibration mode.");
+        DbHandler::InsertDataNow(CALIBRATIONSTART, NAMEOF(RESTApi), "System entered the calibration mode.");
         return response;
     }
 
@@ -119,7 +117,7 @@ namespace DebuggerInfrastructure
         if(calibrationActive == true)
         {
             calibrationActive = false;
-            dbHandler->InsertDataNow(CALIBRATIONEND, NAMEOF(RESTApi), "System exited the calibration mode.");
+            DbHandler::InsertDataNow(CALIBRATIONEND, NAMEOF(RESTApi), "System exited the calibration mode.");
         }
         return response;
     }

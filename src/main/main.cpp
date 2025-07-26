@@ -138,6 +138,7 @@ void setupSignalHandlers() {
 
 int main()
 {
+    setupSignalHandlers();
     try {
         DebuggerInfrastructure::InitializeCore();
         auto webUi = DebuggerInfrastructure::InitializeWeb();

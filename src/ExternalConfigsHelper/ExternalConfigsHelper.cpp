@@ -92,9 +92,9 @@ namespace DebuggerInfrastructure
     }
 
     CalibrationSettings ExternalConfigsHelper::defaultCalibrationSettings = CalibrationSettings{
-        {31.0, 52.0},
-        {31.0, 53.0},
-        {42.0, 42.0}
+        {32.0, 54.0}, //Calibration X
+        {36.5, 56.0}, //Calibration Y
+        {46.0, 45.0}  //Calibration Center
     };
     std::unordered_map<std::string, CalibrationSettings> ExternalConfigsHelper::settingsMap;
 }
